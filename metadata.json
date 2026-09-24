@@ -1,0 +1,6 @@
+{
+  "name": "SuppleTrack - Supplement & Vitamin Regimen Tracker",
+  "description": "Smart supplement regimen tracker with weekly dosing, course duration timers, dosage countdowns, notifications, and adherence analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

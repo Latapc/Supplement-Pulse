@@ -34,8 +34,8 @@ jobs:
 
       - name: Setup Capacitor & Sync Android
         run: |
-          npx cap add android || true
-          npx cap sync android
+          npx @capacitor/cli add android || true
+          npx @capacitor/cli sync android
 
       - name: Fix Kotlin Version Conflict
         run: |

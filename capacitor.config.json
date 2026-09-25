@@ -1,0 +1,6 @@
+{
+  "appId": "com.supplementpulse.app",
+  "appName": "Supplement Pulse",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

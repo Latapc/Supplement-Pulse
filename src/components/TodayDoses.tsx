@@ -14,7 +14,9 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { TodaySupplementStatus, Supplement, DoseLog } from '../types/supplement';
+import { UserProfile } from '../types/profile';
 import { playChimeSound } from '../utils/audio';
+import { triggerHaptic, playSuccessChime } from '../utils/soundEffects';
 
 interface TodayDosesProps {
   todayStatuses: TodaySupplementStatus[];
@@ -30,6 +32,10 @@ interface TodayDosesProps {
   onSelectSupplement: (supplement: Supplement) => void;
   onRefillStock?: (supplementId: string) => void;
   currentTime: Date;
+  profiles?: UserProfile[];
+  activeProfileId?: string;
+  onSelectProfile?: (profileId: string) => void;
+  onOpenProfileSwitcher?: () => void;
 }
 
 export const TodayDoses: React.FC<TodayDosesProps> = ({
@@ -46,6 +52,10 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
   onSelectSupplement,
   onRefillStock,
   currentTime,
+  profiles = [],
+  activeProfileId = 'profile_self',
+  onSelectProfile,
+  onOpenProfileSwitcher,
 }) => {
   const [partialModalSupp, setPartialModalSupp] = useState<Supplement | null>(null);
   const [partialAmount, setPartialAmount] = useState<number>(0);
@@ -105,8 +115,106 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
     setPartialModalSupp(null);
   };
 
+  const profileMap = React.useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    profiles.forEach(p => map.set(p.id, p));
+    return map;
+  }, [profiles]);
+
+  const activeProfile = profileMap.get(activeProfileId) || profiles[0];
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+
+      {/* Google TV Multi-Profile Switcher Strip */}
+      {profiles.length > 1 && (
+        <div className="p-3 sm:p-4 rounded-3xl bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider pl-1">
+              Active Profile:
+            </span>
+            {profiles.map(p => {
+              const isSelected = p.id === activeProfileId;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => onSelectProfile?.(p.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition active:scale-95 ${
+                    isSelected
+                      ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 shadow-sm'
+                      : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-750'
+                  }`}
+                >
+                  <span className={`w-4 h-4 rounded-full bg-gradient-to-tr ${p.themeGradient} text-white flex items-center justify-center text-[9px]`}>
+                    {p.avatar === 'heart' ? '♥' : p.avatar === 'sparkles' ? '★' : '•'}
+                  </span>
+                  <span>{p.name}</span>
+                  {p.type === 'assisted' && (
+                    <span className="text-[9px] px-1 rounded-sm bg-blue-500/20 text-blue-600 dark:text-blue-300">
+                      Care
+                    </span>
+                  )}
+                  {p.type === 'kid' && (
+                    <span className="text-[9px] px-1 rounded-sm bg-pink-500/20 text-pink-600 dark:text-pink-300">
+                      Kids
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {onOpenProfileSwitcher && (
+            <button
+              type="button"
+              onClick={onOpenProfileSwitcher}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5 transition"
+            >
+              <span>Switch / Add Profiles</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Dad Assisted Care Mode Banner */}
+      {activeProfile?.type === 'assisted' && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 flex items-start gap-3.5 shadow-2xs">
+          <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+            ♥
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold text-blue-950 dark:text-blue-100 font-display">
+              Caregiver View: {activeProfile.name}'s Health Regimen
+            </h4>
+            <p className="text-xs text-blue-800 dark:text-blue-300">
+              Assisted care is active. Make sure {activeProfile.name} takes morning doses with food and a full glass of water. Mark doses complete below on his behalf.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Kids Fun Gamified Mode Banner */}
+      {activeProfile?.type === 'kid' && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-50 via-rose-50 to-pink-50 dark:from-pink-950/30 dark:via-purple-950/30 dark:to-rose-950/30 border border-pink-200 dark:border-pink-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-sm text-lg font-bold">
+              ⭐
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-pink-950 dark:text-pink-100 font-display">
+                {activeProfile.name}'s Daily Vitamin Adventure!
+              </h4>
+              <p className="text-xs text-pink-800 dark:text-pink-300 mt-0.5">
+                Take your chewable gummy vitamins every day to build your health streak and earn gold stars!
+              </p>
+            </div>
+          </div>
+          <div className="px-3.5 py-1.5 rounded-2xl bg-white dark:bg-stone-800 border border-pink-200 dark:border-pink-700 text-xs font-bold text-pink-600 dark:text-pink-300 flex items-center gap-1.5 shadow-2xs self-start sm:self-auto">
+            <span>⭐⭐ 2 Stars Earned Today!</span>
+          </div>
+        </div>
+      )}
 
       {/* Global Low Stock Alert Banner (when any supplement is running low) */}
       {lowStockSupplements.length > 0 && (
@@ -173,6 +281,7 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
               const { supplement, remainingDoseToday, totalScheduledDose, totalTakenDose } = status;
               const hasTakenPartial = totalTakenDose > 0;
               const hasStock = status.remainingStock !== undefined;
+              const suppProfile = profileMap.get(supplement.profileId || 'profile_self');
 
               return (
                 <div
@@ -180,9 +289,18 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
                   className="bg-white rounded-3xl border border-stone-200/80 p-5 sm:p-6 shadow-xs hover:border-stone-300 transition-all flex flex-col justify-between"
                 >
                   <div>
-                    {/* Header line: Form / Category */}
+                    {/* Header line: Form / Category and Profile Badge */}
                     <div className="flex items-center justify-between text-xs text-stone-500 mb-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
+                        {suppProfile && (
+                          <span 
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white flex items-center gap-1 shadow-2xs"
+                            style={{ backgroundColor: suppProfile.accentColor || '#10b981' }}
+                          >
+                            <span>{suppProfile.avatar === 'heart' ? '♥' : suppProfile.avatar === 'sparkles' ? '★' : '•'}</span>
+                            <span>{suppProfile.name}</span>
+                          </span>
+                        )}
                         <span className="capitalize font-medium text-stone-700">
                           {supplement.form} · {supplement.category}
                         </span>
@@ -300,7 +418,13 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
                       className="flex-1 h-11 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-2xl flex items-center justify-center gap-2 shadow-xs transition-colors"
                     >
                       <Check className="w-4 h-4 stroke-[3]" />
-                      <span>Take Full Dose ({remainingDoseToday.toLocaleString()} {supplement.unit})</span>
+                      <span>
+                        {suppProfile?.type === 'assisted'
+                          ? `Check off for ${suppProfile.name}`
+                          : suppProfile?.type === 'kid'
+                          ? 'Take Gummy & Earn Star! ⭐'
+                          : `Take Full Dose (${remainingDoseToday.toLocaleString()} ${supplement.unit})`}
+                      </span>
                     </button>
 
                     <button

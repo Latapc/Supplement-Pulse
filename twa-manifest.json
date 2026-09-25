@@ -1,0 +1,37 @@
+{
+  "packageId": "com.suppletrack.app",
+  "host": "ais-pre-p3la4lr6wdctj7sor2qxpy-206831609121.asia-southeast1.run.app",
+  "name": "SuppleTrack",
+  "launcherName": "SuppleTrack",
+  "themeColor": "#0f172a",
+  "navigationColor": "#0f172a",
+  "backgroundColor": "#0f172a",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://ais-pre-p3la4lr6wdctj7sor2qxpy-206831609121.asia-southeast1.run.app/pwa-512x512.png",
+  "maskableIconUrl": "https://ais-pre-p3la4lr6wdctj7sor2qxpy-206831609121.asia-southeast1.run.app/pwa-maskable-512x512.png",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Today's Regimen",
+      "short_name": "Today",
+      "url": "/?tab=today",
+      "icon": "https://ais-pre-p3la4lr6wdctj7sor2qxpy-206831609121.asia-southeast1.run.app/pwa-192x192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://ais-pre-p3la4lr6wdctj7sor2qxpy-206831609121.asia-southeast1.run.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  }
+}

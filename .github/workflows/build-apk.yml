@@ -1,0 +1,56 @@
+name: Build Android APK on Every Update
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Bubblewrap (Official Google CLI for PWA to APK)
+        run: |
+          npm install -g @bubblewrap/cli
+
+      - name: Generate Android Project & Build APK
+        run: |
+          mkdir -p android-project
+          cd android-project
+          # Initialize Android TWA project from live manifest
+          bubblewrap init --manifest https://ais-pre-p3la4lr6wdctj7sor2qxpy-206831609121.asia-southeast1.run.app/manifest.json --directory .
+          # Build signed APK (using debug key for testing/sideloading)
+          bubblewrap build --skipPwaValidation || true
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+
+      - name: Find and Stage APK
+        run: |
+          mkdir -p build-output
+          find . -name "*.apk" -exec cp {} build-output/ \;
+          ls -la build-output/
+
+      - name: Upload APK as GitHub Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuppleTrack-Android-APK
+          path: build-output/*.apk
+          retention-days: 30

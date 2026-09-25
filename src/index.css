@@ -51,27 +51,27 @@ html.dark .border-stone-300 {
 
 /* High contrast typography in dark mode */
 html.dark .text-stone-900 {
-  color: #fafaf9 !important;
+  color: #ffffff !important;
 }
 
 html.dark .text-stone-800 {
-  color: #f5f5f4 !important;
+  color: #fafaf9 !important;
 }
 
 html.dark .text-stone-700 {
-  color: #e7e5e4 !important;
+  color: #f5f5f4 !important;
 }
 
 html.dark .text-stone-600 {
-  color: #d6d3d1 !important;
+  color: #e7e5e4 !important;
 }
 
 html.dark .text-stone-500 {
-  color: #a8a29e !important;
+  color: #d6d3d1 !important;
 }
 
 html.dark .text-stone-400 {
-  color: #8c847d !important;
+  color: #cbd5e1 !important;
 }
 
 /* High contrast for tinted alert cards and badges */

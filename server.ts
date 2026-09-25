@@ -451,6 +451,24 @@ app.delete('/api/sync/delete', (req, res) => {
 async function main() {
   const isProd = process.env.NODE_ENV === 'production';
 
+  // Explicit PWA manifest endpoints so external crawlers (PWABuilder, Lighthouse) always receive valid JSON
+  const manifestPath = path.resolve(__dirname, 'public', 'manifest.json');
+  app.get(['/manifest.json', '/manifest.webmanifest'], (req, res) => {
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+    res.sendFile(manifestPath);
+  });
+
+  // Explicit Service Worker endpoint with proper headers
+  const swPath = path.resolve(__dirname, 'public', 'sw.js');
+  app.get('/sw.js', (req, res) => {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Service-Worker-Allowed', '/');
+    res.sendFile(swPath);
+  });
+
+  // Serve static files from public directory directly (PNG icons, SVG, screenshots)
+  app.use(express.static(path.resolve(__dirname, 'public')));
+
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

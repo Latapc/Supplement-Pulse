@@ -8,28 +8,30 @@ import {
   User 
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Supplement, DoseLog, UserProfile } from '../types/supplement';
+import { Supplement, DoseLog } from '../types/supplement';
 
 // Initialize Firebase App safely
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Use Google Auth with Calendar events scope
+// Scopes for Google Calendar synchronization
+export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+
 const provider = new GoogleAuthProvider();
-provider.addScope('https://www.googleapis.com/auth/calendar.events');
+provider.addScope(CALENDAR_SCOPE);
 provider.setCustomParameters({
   prompt: 'select_account',
 });
 
 let isSigningIn = false;
-let cachedGoogleAccessToken: string | null = null;
+let cachedOAuthToken: string | null = null;
 
-export function getCachedGoogleAccessToken(): string | null {
-  return cachedGoogleAccessToken;
+export function getOAuthAccessToken(): string | null {
+  return cachedOAuthToken;
 }
 
-export function setCachedGoogleAccessToken(token: string | null) {
-  cachedGoogleAccessToken = token;
+export function setOAuthAccessToken(token: string | null) {
+  cachedOAuthToken = token;
 }
 
 export interface CloudRegimenData {
@@ -37,8 +39,6 @@ export interface CloudRegimenData {
   appName: string;
   updatedAt: string;
   userEmail?: string;
-  profiles?: UserProfile[];
-  activeProfileId?: string;
   supplements: Supplement[];
   logs: DoseLog[];
   dismissedDoses?: Record<string, string[]>;
@@ -47,7 +47,6 @@ export interface CloudRegimenData {
 export interface GoogleSyncState {
   user: User | null;
   hasDriveAccess: boolean;
-  hasCalendarAccess: boolean;
   isSyncing: boolean;
   lastSyncedTime: string | null;
   lastError: string | null;
@@ -62,14 +61,14 @@ export function initGoogleAuth(
 ) {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (!user) {
-      cachedGoogleAccessToken = null;
+      cachedOAuthToken = null;
     }
-    onStateChange(user, cachedGoogleAccessToken || (user ? user.uid : null));
+    onStateChange(user, cachedOAuthToken || (user ? user.uid : null));
   });
 }
 
 /**
- * Sign in with Google Account with Google Calendar events scope
+ * Sign in with Google Account safely (unrestricted, works for any Google account)
  */
 export async function signInWithGoogle(): Promise<{ user: User; accessToken: string }> {
   try {
@@ -77,9 +76,9 @@ export async function signInWithGoogle(): Promise<{ user: User; accessToken: str
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
-      cachedGoogleAccessToken = credential.accessToken;
+      cachedOAuthToken = credential.accessToken;
     }
-    return { user: result.user, accessToken: cachedGoogleAccessToken || result.user.uid };
+    return { user: result.user, accessToken: cachedOAuthToken || result.user.uid };
   } catch (error: any) {
     console.error('Google Sign In failed:', error);
     throw error;
@@ -93,11 +92,11 @@ export async function signInWithGoogle(): Promise<{ user: User; accessToken: str
  */
 export async function signOutFromGoogle(): Promise<void> {
   await fbSignOut(auth);
-  cachedGoogleAccessToken = null;
+  cachedOAuthToken = null;
 }
 
 export function getGoogleAccessToken(): string | null {
-  return cachedGoogleAccessToken || (auth.currentUser ? auth.currentUser.uid : null);
+  return cachedOAuthToken || (auth.currentUser ? auth.currentUser.uid : null);
 }
 
 /**

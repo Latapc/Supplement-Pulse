@@ -13,6 +13,7 @@ import {
   Repeat
 } from 'lucide-react';
 import { Supplement, DoseUnit, FrequencyType, DayOfWeek, FoodTiming } from '../types/supplement';
+import { UserProfile } from '../types/profile';
 import { formatDateToYYYYMMDD, calculateEndDate, getDayShortName } from '../utils/dates';
 
 interface SupplementModalProps {
@@ -21,6 +22,8 @@ interface SupplementModalProps {
   onSave: (supplement: Supplement) => void;
   editingSupplement?: Supplement | null;
   onOpenSpecialAi?: () => void;
+  profiles?: UserProfile[];
+  activeProfileId?: string;
 }
 
 const PRESET_TEMPLATES = [
@@ -116,9 +119,12 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
   onSave,
   editingSupplement,
   onOpenSpecialAi,
+  profiles = [],
+  activeProfileId = 'profile_self',
 }) => {
   const todayStr = formatDateToYYYYMMDD(new Date());
 
+  const [profileId, setProfileId] = useState<string>(activeProfileId);
   const [name, setName] = useState('');
   const [doseAmount, setDoseAmount] = useState<number>(60000);
   const [unit, setUnit] = useState<DoseUnit>('IU');
@@ -156,6 +162,7 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
 
   useEffect(() => {
     if (editingSupplement) {
+      setProfileId(editingSupplement.profileId || activeProfileId || 'profile_self');
       setName(editingSupplement.name);
       setDoseAmount(editingSupplement.doseAmount);
       setUnit(editingSupplement.unit);
@@ -283,6 +290,7 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
 
     const supplement: Supplement = {
       id: editingSupplement ? editingSupplement.id : `supp-${Date.now()}`,
+      profileId: profileId || 'profile_self',
       name: name.trim(),
       doseAmount: Number(doseAmount) || 1,
       unit,
@@ -379,6 +387,40 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
+          {/* Profile Assignment (Google TV Style) */}
+          {profiles.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
+                Assign to Family / Care Profile
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {profiles.map((p) => {
+                  const isSelected = profileId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setProfileId(p.id)}
+                      className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition text-left ${
+                        isSelected
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200 ring-2 ring-emerald-500/20 shadow-xs'
+                          : 'border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100'
+                      }`}
+                    >
+                      <div className={`w-6 h-6 rounded-full bg-gradient-to-tr ${p.themeGradient} text-white flex items-center justify-center text-[10px] shrink-0`}>
+                        {p.name.charAt(0)}
+                      </div>
+                      <div className="truncate">
+                        <div className="truncate">{p.name}</div>
+                        <div className="text-[10px] opacity-70 font-normal">{p.relation}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Row 1: Supplement Name */}
           <div>
             <label className="block text-xs font-semibold text-stone-700 mb-1.5">

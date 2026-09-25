@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig } from 'vite';
+import {defineConfig} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
@@ -11,18 +11,24 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        manifestFilename: 'manifest.json',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
-          name: 'SuppleTrack - Supplement & Vitamin Tracker',
+          name: 'SuppleTrack - Supplement & Vitamin Regimen Tracker',
           short_name: 'SuppleTrack',
-          description: 'Smart supplement regimen tracker with Google Calendar sync, multi-family profiles, and scheduled dose notifications.',
-          theme_color: '#10b981',
-          background_color: '#0c0a09',
+          description: 'Smart supplement regimen tracker with multiple profiles, Google Calendar sync, dosage countdowns, notifications, and adherence analytics.',
+          theme_color: '#0f172a',
+          background_color: '#0f172a',
           display: 'standalone',
+          display_override: ['window-controls-overlay', 'standalone'],
           orientation: 'portrait-primary',
           start_url: '/',
           scope: '/',
+          lang: 'en-US',
+          dir: 'ltr',
+          categories: ['health', 'medical', 'lifestyle'],
+          prefer_related_applications: false,
           icons: [
             {
               src: '/pwa-192x192.png',
@@ -43,26 +49,38 @@ export default defineConfig(() => {
               purpose: 'maskable',
             },
           ],
+          shortcuts: [
+            {
+              name: "Today's Regimen",
+              short_name: 'Today',
+              description: "Check off today's scheduled doses",
+              url: '/?tab=today',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: 'My Stash',
+              short_name: 'Stash',
+              description: 'View supplement inventory and stocks',
+              url: '/?tab=supplements',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+          ],
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
     ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname || '.'),
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };

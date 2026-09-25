@@ -30,12 +30,17 @@ import {
   ChatActionSnapshot 
 } from './components/AiChatDrawer';
 import { GoogleAccountSyncModal } from './components/GoogleAccountSyncModal';
+import { ProfileSwitcherModal } from './components/ProfileSwitcherModal';
+import { GoogleCalendarModal } from './components/GoogleCalendarModal';
+import { NotificationsModal } from './components/NotificationsModal';
+import { AndroidInstallModal } from './components/AndroidInstallModal';
 import { User } from 'firebase/auth';
 import { 
   initGoogleAuth, 
   signInWithGoogle, 
   signOutFromGoogle, 
   getGoogleAccessToken,
+  getOAuthAccessToken,
   findDriveBackupFile, 
   downloadFromDrive, 
   uploadToDrive, 
@@ -48,11 +53,16 @@ import {
   DoseLog, 
   TodaySupplementStatus 
 } from './types/supplement';
+import { UserProfile, INITIAL_PROFILES } from './types/profile';
 import { 
   loadSupplements, 
   saveSupplements, 
   loadDoseLogs, 
   saveDoseLogs, 
+  loadProfiles,
+  saveProfiles,
+  loadActiveProfileId,
+  saveActiveProfileId,
   resetToDemoData 
 } from './utils/storage';
 import { 
@@ -63,6 +73,11 @@ import {
 import { 
   playChimeSound 
 } from './utils/audio';
+import { 
+  playReminderChime, 
+  triggerHaptic, 
+  playSuccessChime 
+} from './utils/soundEffects';
 import { 
   Plus, 
   CheckCircle2, 
@@ -83,6 +98,52 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatSpecialMode, setChatSpecialMode] = useState<boolean>(false);
   const [chatInitialPrompt, setChatInitialPrompt] = useState<string | undefined>(undefined);
+
+  // Google TV Family & Multi-Profile States
+  const [profiles, setProfiles] = useState<UserProfile[]>(() => loadProfiles());
+  const [activeProfileId, setActiveProfileId] = useState<string>(() => loadActiveProfileId());
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  // New Integration Modals (Google Calendar, Device Notifications, Android APK)
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
+
+  const activeProfile = useMemo(() => {
+    return profiles.find((p) => p.id === activeProfileId) || profiles[0] || INITIAL_PROFILES[0];
+  }, [profiles, activeProfileId]);
+
+  const profileMap = useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    profiles.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [profiles]);
+
+  const handleSelectProfile = (id: string) => {
+    setActiveProfileId(id);
+    saveActiveProfileId(id);
+    triggerHaptic('light');
+    const p = profiles.find((item) => item.id === id);
+    setToastMessage(`Switched profile to ${p?.name || 'User'} (${p?.relation || ''})`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleSaveProfiles = (newProfiles: UserProfile[]) => {
+    setProfiles(newProfiles);
+    saveProfiles(newProfiles);
+  };
+
+  const handleDeleteProfile = (profileId: string) => {
+    const updated = profiles.filter((p) => p.id !== profileId);
+    setProfiles(updated);
+    saveProfiles(updated);
+    if (activeProfileId === profileId) {
+      setActiveProfileId('profile_self');
+      saveActiveProfileId('profile_self');
+    }
+    setToastMessage('Profile deleted.');
+    setTimeout(() => setToastMessage(null), 2500);
+  };
 
   const handleOpenSpecialChat = (prompt?: string) => {
     setChatSpecialMode(true);
@@ -526,6 +587,7 @@ export default function App() {
 
     const newLog: DoseLog = {
       id: `log-${Date.now()}`,
+      profileId: supplement.profileId || activeProfileId || 'profile_self',
       supplementId: supplement.id,
       supplementName: supplement.name,
       amountTaken: amountToLog,
@@ -535,6 +597,9 @@ export default function App() {
       time: timeStr,
       notes: notes || undefined,
     };
+
+    triggerHaptic('success');
+    playSuccessChime();
 
     const updatedLogs = [newLog, ...logs];
     setLogs(updatedLogs);
@@ -788,10 +853,12 @@ export default function App() {
   // Reset to default preset demo data
   const handleResetData = () => {
     if (window.confirm('Reset all supplements and logs to default starting presets?')) {
-      const { supps, logs: seedLogs } = resetToDemoData();
+      const { supps, logs: seedLogs, profiles: seedProfiles } = resetToDemoData();
       setSupplements(supps);
       setLogs(seedLogs);
-      setToastMessage('Reset to default supplement regimen.');
+      if (seedProfiles) setProfiles(seedProfiles);
+      setActiveProfileId('profile_self');
+      setToastMessage('Reset to default supplement regimen & family profiles.');
       setTimeout(() => setToastMessage(null), 3000);
     }
   };
@@ -804,8 +871,10 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         notificationsEnabled={notificationPermission === 'granted'}
-        onToggleNotifications={handleRequestNotificationPermission}
-        onTestSound={handleTestSound}
+        onOpenNotifications={() => setIsNotificationsModalOpen(true)}
+        onOpenCalendarSync={() => setIsCalendarModalOpen(true)}
+        onOpenProfileSwitcher={() => setIsProfileModalOpen(true)}
+        onOpenAndroidInstall={() => setIsAndroidModalOpen(true)}
         todayDueCount={todayDueCount}
         googleUser={googleUser}
         isSyncing={isSyncing}
@@ -813,6 +882,7 @@ export default function App() {
         onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        activeProfile={activeProfile}
       />
 
       {/* Main Container */}
@@ -878,26 +948,30 @@ export default function App() {
             />
 
             <TodayDoses
-            todayStatuses={todayStatuses}
-            allSupplements={supplements}
-            todayLogs={todayLogs}
-            onTakeDose={handleTakeDose}
-            onUndoDose={handleUndoDose}
-            onDeleteLog={handleDeleteLog}
-            onDeleteDoseToday={handleDeleteDoseToday}
-            onRestoreDoseToday={handleRestoreDoseToday}
-            onDeleteSupplement={handleDeleteSupplement}
-            onOpenAddModal={() => {
-              setEditingSupplement(null);
-              setIsAddModalOpen(true);
-            }}
-            onSelectSupplement={(s) => {
-              setEditingSupplement(s);
-              setIsAddModalOpen(true);
-            }}
-            onRefillStock={handleRefillStock}
-            currentTime={currentTime}
-          />
+              todayStatuses={todayStatuses}
+              allSupplements={supplements}
+              todayLogs={todayLogs}
+              onTakeDose={handleTakeDose}
+              onUndoDose={handleUndoDose}
+              onDeleteLog={handleDeleteLog}
+              onDeleteDoseToday={handleDeleteDoseToday}
+              onRestoreDoseToday={handleRestoreDoseToday}
+              onDeleteSupplement={handleDeleteSupplement}
+              onOpenAddModal={() => {
+                setEditingSupplement(null);
+                setIsAddModalOpen(true);
+              }}
+              onSelectSupplement={(s) => {
+                setEditingSupplement(s);
+                setIsAddModalOpen(true);
+              }}
+              onRefillStock={handleRefillStock}
+              currentTime={currentTime}
+              profiles={profiles}
+              activeProfileId={activeProfileId}
+              onSelectProfile={handleSelectProfile}
+              onOpenProfileSwitcher={() => setIsProfileModalOpen(true)}
+            />
           </>
         )}
 
@@ -960,6 +1034,7 @@ export default function App() {
                   key={status.supplement.id}
                   supplement={status.supplement}
                   status={status}
+                  profile={profileMap.get(status.supplement.profileId || 'profile_self')}
                   onEdit={(s) => {
                     setEditingSupplement(s);
                     setIsAddModalOpen(true);
@@ -1052,6 +1127,41 @@ export default function App() {
         onSave={handleSaveSupplement}
         editingSupplement={editingSupplement}
         onOpenSpecialAi={() => handleOpenSpecialChat()}
+        profiles={profiles}
+        activeProfileId={activeProfileId}
+      />
+
+      {/* Google TV Family & Multi-Profile Switcher Modal */}
+      <ProfileSwitcherModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        profiles={profiles}
+        activeProfileId={activeProfileId}
+        onSelectProfile={handleSelectProfile}
+        onSaveProfiles={handleSaveProfiles}
+        onDeleteProfile={handleDeleteProfile}
+      />
+
+      {/* Google Calendar Sync Modal */}
+      <GoogleCalendarModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+        supplements={supplements}
+        profiles={profiles}
+        userEmail={googleUser?.email}
+      />
+
+      {/* Device & Browser Dose Notifications Modal */}
+      <NotificationsModal
+        isOpen={isNotificationsModalOpen}
+        onClose={() => setIsNotificationsModalOpen(false)}
+        activeProfileName={activeProfile.name}
+      />
+
+      {/* Android APK & Mobile Application Hub Modal */}
+      <AndroidInstallModal
+        isOpen={isAndroidModalOpen}
+        onClose={() => setIsAndroidModalOpen(false)}
       />
 
       {/* Google Account Cloud Sync Modal */}

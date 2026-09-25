@@ -1,77 +1,11 @@
-import { Supplement, DoseLog, UserProfile } from '../types/supplement';
+import { Supplement, DoseLog } from '../types/supplement';
+import { UserProfile, INITIAL_PROFILES } from '../types/profile';
 import { formatDateToYYYYMMDD, calculateEndDate } from './dates';
 
-const STORAGE_PROFILES_KEY = 'suppletrack_profiles_v1';
-const STORAGE_ACTIVE_PROFILE_KEY = 'suppletrack_active_profile_v1';
 const STORAGE_SUPPLEMENTS_KEY = 'suppletrack_supplements_v1';
 const STORAGE_LOGS_KEY = 'suppletrack_logs_v1';
-const STORAGE_NOTIFICATION_KEY = 'suppletrack_notifications_v1';
-
-export function getInitialProfiles(): UserProfile[] {
-  return [
-    {
-      id: 'profile_me',
-      name: 'Neelam (Me)',
-      relationship: 'Self',
-      type: 'adult',
-      avatarIcon: 'user',
-      themeColor: 'emerald',
-      notes: 'Primary personal regimen, energy, cellular health & vitality',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'profile_dad',
-      name: 'Dad',
-      relationship: 'Dad',
-      type: 'senior',
-      avatarIcon: 'glasses',
-      themeColor: 'sky',
-      notes: 'Senior cardiovascular vitality, joint flexibility & blood pressure wellness',
-      createdAt: new Date().toISOString(),
-    },
-  ];
-}
-
-export function loadProfiles(): UserProfile[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_PROFILES_KEY);
-    if (!raw) {
-      const initial = getInitialProfiles();
-      saveProfiles(initial);
-      return initial;
-    }
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
-    }
-    return getInitialProfiles();
-  } catch (e) {
-    console.error('Error loading profiles from storage', e);
-    return getInitialProfiles();
-  }
-}
-
-export function saveProfiles(profiles: UserProfile[]) {
-  try {
-    localStorage.setItem(STORAGE_PROFILES_KEY, JSON.stringify(profiles));
-  } catch (e) {
-    console.error('Error saving profiles to storage', e);
-  }
-}
-
-export function loadActiveProfileId(): string {
-  try {
-    const saved = localStorage.getItem(STORAGE_ACTIVE_PROFILE_KEY);
-    if (saved) return saved;
-  } catch (e) {}
-  return 'profile_me';
-}
-
-export function saveActiveProfileId(id: string) {
-  try {
-    localStorage.setItem(STORAGE_ACTIVE_PROFILE_KEY, id);
-  } catch (e) {}
-}
+const STORAGE_PROFILES_KEY = 'suppletrack_profiles_v1';
+const STORAGE_ACTIVE_PROFILE_KEY = 'suppletrack_active_profile_v1';
 
 export function getInitialSupplements(): Supplement[] {
   const today = new Date();
@@ -87,13 +21,12 @@ export function getInitialSupplements(): Supplement[] {
   const twoWeeksAgo = new Date(today);
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
   const dStartStr = formatDateToYYYYMMDD(twoWeeksAgo);
-  const dEndStr = calculateEndDate(dStartStr, 8, 'weeks');
 
   return [
-    // --- Neelam's Regimen ---
+    // --- MYSELF (Primary User) ---
     {
       id: 'supp-vit-d-60k',
-      profileId: 'profile_me',
+      profileId: 'profile_self',
       name: 'Vitamin D3 (Cholecalciferol)',
       doseAmount: 60000,
       unit: 'IU',
@@ -102,10 +35,8 @@ export function getInitialSupplements(): Supplement[] {
       colorTag: 'amber',
       frequencyType: 'weekly',
       selectedDays: [1], // Monday
-      doseTime: '09:00',
-      foodTiming: 'with_food',
       duration: {
-        type: 'infinity', // For Life (Infinity) - never stops after 3 months
+        type: 'infinity',
         startDate: dStartStr,
       },
       inventory: {
@@ -116,12 +47,12 @@ export function getInitialSupplements(): Supplement[] {
         lowStockThreshold: 4,
         lastRestockedDate: dStartStr,
       },
-      notes: 'High-dose weekly booster taken for life (Infinity protocol) for optimal cellular and hormonal health.',
+      notes: 'High-dose weekly booster taken for life for optimal cellular and hormonal health.',
       createdAt: new Date().toISOString(),
     },
     {
       id: 'supp-boron-cyclic',
-      profileId: 'profile_me',
+      profileId: 'profile_self',
       name: 'Boron (Glycinate Complex)',
       doseAmount: 6,
       unit: 'mg',
@@ -129,12 +60,10 @@ export function getInitialSupplements(): Supplement[] {
       category: 'minerals',
       colorTag: 'indigo',
       frequencyType: 'daily',
-      doseTime: '09:30',
-      foodTiming: 'with_food',
       cycleConfig: {
         isCyclic: true,
-        onDays: 14, // 2 weeks ON
-        offDays: 7, // 1 week OFF
+        onDays: 14,
+        offDays: 7,
         cycleStartDate: b12StartStr,
       },
       duration: {
@@ -149,12 +78,12 @@ export function getInitialSupplements(): Supplement[] {
         lowStockThreshold: 10,
         lastRestockedDate: b12StartStr,
       },
-      notes: 'Special Cyclic Protocol: Take daily for 2 weeks (14 days), take a 1-week break (7 days), and repeat indefinitely for free testosterone & bone mineral balance.',
+      notes: 'Special Cyclic Protocol: Take daily for 2 weeks, pause 1 week, repeat.',
       createdAt: new Date().toISOString(),
     },
     {
       id: 'supp-vit-b12-1500',
-      profileId: 'profile_me',
+      profileId: 'profile_self',
       name: 'Vitamin B12 (Methylcobalamin)',
       doseAmount: 1500,
       unit: 'mg',
@@ -163,8 +92,6 @@ export function getInitialSupplements(): Supplement[] {
       colorTag: 'rose',
       frequencyType: 'weekly',
       selectedDays: [1], // Monday
-      doseTime: '10:00',
-      foodTiming: 'with_morning_meal',
       duration: {
         type: 'fixed',
         startDate: b12StartStr,
@@ -180,12 +107,12 @@ export function getInitialSupplements(): Supplement[] {
         lowStockThreshold: 5,
         lastRestockedDate: b12StartStr,
       },
-      notes: 'Weekly high-dose booster to restore optimal neurological & cellular energy levels.',
+      notes: 'Weekly high-dose booster for neurological & cellular energy levels.',
       createdAt: new Date().toISOString(),
     },
     {
       id: 'supp-magnesium-glycinate',
-      profileId: 'profile_me',
+      profileId: 'profile_self',
       name: 'Magnesium Glycinate',
       doseAmount: 400,
       unit: 'mg',
@@ -193,8 +120,6 @@ export function getInitialSupplements(): Supplement[] {
       category: 'minerals',
       colorTag: 'indigo',
       frequencyType: 'daily',
-      doseTime: '21:30',
-      foodTiming: 'before_bed',
       duration: {
         type: 'continuous',
         startDate: b12StartStr,
@@ -207,12 +132,12 @@ export function getInitialSupplements(): Supplement[] {
         lowStockThreshold: 10,
         lastRestockedDate: b12StartStr,
       },
-      notes: 'Deep relaxation and muscle recovery support.',
+      notes: 'Deep relaxation and muscle recovery support before bed.',
       createdAt: new Date().toISOString(),
     },
     {
       id: 'supp-omega-3',
-      profileId: 'profile_me',
+      profileId: 'profile_self',
       name: 'Omega-3 Fish Oil (EPA / DHA)',
       doseAmount: 1000,
       unit: 'mg',
@@ -220,8 +145,6 @@ export function getInitialSupplements(): Supplement[] {
       category: 'omega',
       colorTag: 'sky',
       frequencyType: 'daily',
-      doseTime: '13:00',
-      foodTiming: 'with_food',
       duration: {
         type: 'continuous',
         startDate: b12StartStr,
@@ -234,119 +157,138 @@ export function getInitialSupplements(): Supplement[] {
         lowStockThreshold: 14,
         lastRestockedDate: b12StartStr,
       },
-      notes: 'Cardiovascular and cellular support.',
+      notes: 'Cardiovascular and cellular support taken with lunch.',
       createdAt: new Date().toISOString(),
     },
 
-    // --- Dad's Regimen ---
+    // --- DAD'S PROFILE ---
     {
       id: 'supp-dad-coq10',
       profileId: 'profile_dad',
-      name: 'CoQ10 Ubiquinol (Active Antioxidant)',
-      doseAmount: 200,
-      unit: 'mg',
-      form: 'softgel',
-      category: 'general',
-      colorTag: 'rose',
-      frequencyType: 'daily',
-      doseTime: '13:00',
-      foodTiming: 'with_food',
-      duration: {
-        type: 'infinity',
-        startDate: b12StartStr,
-      },
-      inventory: {
-        trackStock: true,
-        currentStock: 35,
-        bottleSize: 60,
-        unit: 'softgels',
-        lowStockThreshold: 10,
-        lastRestockedDate: b12StartStr,
-      },
-      notes: "Dad's cardiovascular cellular energy and heart muscle vitality, taken with lunch.",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'supp-dad-glucosamine',
-      profileId: 'profile_dad',
-      name: 'Glucosamine & Chondroitin Complex',
-      doseAmount: 1500,
-      unit: 'mg',
-      form: 'tablet',
-      category: 'minerals',
-      colorTag: 'emerald',
-      frequencyType: 'daily',
-      doseTime: '08:30',
-      foodTiming: 'with_morning_meal',
-      duration: {
-        type: 'infinity',
-        startDate: b12StartStr,
-      },
-      inventory: {
-        trackStock: true,
-        currentStock: 52,
-        bottleSize: 90,
-        unit: 'tablets',
-        lowStockThreshold: 14,
-        lastRestockedDate: b12StartStr,
-      },
-      notes: "Dad's joint flexibility, knee cartilage cushion & walking comfort.",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'supp-dad-omega',
-      profileId: 'profile_dad',
-      name: 'Triple Strength Omega-3 EPA/DHA',
-      doseAmount: 1200,
+      name: 'CoQ10 (Ubiquinol 100mg)',
+      doseAmount: 100,
       unit: 'mg',
       form: 'softgel',
       category: 'omega',
-      colorTag: 'sky',
+      colorTag: 'rose',
       frequencyType: 'daily',
-      doseTime: '13:00',
-      foodTiming: 'with_food',
       duration: {
         type: 'continuous',
-        startDate: b12StartStr,
+        startDate: dStartStr,
       },
       inventory: {
         trackStock: true,
-        currentStock: 40,
+        currentStock: 42,
         bottleSize: 60,
         unit: 'softgels',
         lowStockThreshold: 10,
-        lastRestockedDate: b12StartStr,
+        lastRestockedDate: dStartStr,
       },
-      notes: "Dad's arterial elasticity, triglyceride balance, and cognitive clarity.",
+      notes: 'For Dad: Heart energy and cellular mitochondrial vitality. Take in morning after breakfast with glass of water.',
       createdAt: new Date().toISOString(),
     },
     {
-      id: 'supp-dad-multivitamin',
+      id: 'supp-dad-senior-multi',
       profileId: 'profile_dad',
-      name: "Senior Men's 50+ Multivitamin & Zinc",
+      name: 'Senior 50+ Complete Multivitamin',
       doseAmount: 1,
       unit: 'tablets',
       form: 'tablet',
       category: 'vitamins',
-      colorTag: 'amber',
+      colorTag: 'emerald',
       frequencyType: 'daily',
-      doseTime: '08:30',
-      foodTiming: 'with_morning_meal',
       duration: {
         type: 'continuous',
-        startDate: b12StartStr,
+        startDate: dStartStr,
       },
       inventory: {
         trackStock: true,
         currentStock: 25,
-        bottleSize: 60,
+        bottleSize: 90,
         unit: 'tablets',
-        lowStockThreshold: 10,
-        lastRestockedDate: b12StartStr,
+        lowStockThreshold: 14,
+        lastRestockedDate: dStartStr,
       },
-      notes: "Dad's comprehensive daily micronutrient booster with active B-complex, zinc, and saw palmetto.",
+      notes: 'For Dad: Balanced micronutrients for longevity, eye health (Lutein), and immunity.',
       createdAt: new Date().toISOString(),
     },
+    {
+      id: 'supp-dad-calcium-d3',
+      profileId: 'profile_dad',
+      name: 'Calcium Citrate + Vitamin D3',
+      doseAmount: 500,
+      unit: 'mg',
+      form: 'tablet',
+      category: 'minerals',
+      colorTag: 'sky',
+      frequencyType: 'daily',
+      duration: {
+        type: 'continuous',
+        startDate: dStartStr,
+      },
+      inventory: {
+        trackStock: true,
+        currentStock: 18,
+        bottleSize: 60,
+        unit: 'tablets',
+        lowStockThreshold: 8,
+        lastRestockedDate: dStartStr,
+      },
+      notes: 'For Dad: Joint and bone density preservation. Take with lunch.',
+      createdAt: new Date().toISOString(),
+    },
+
+    // --- KIDS PROFILE ---
+    {
+      id: 'supp-kids-multi-gummy',
+      profileId: 'profile_kids',
+      name: 'Kids Gummy Multivitamin',
+      doseAmount: 2,
+      unit: 'capsules', // Represented as chewable gummies
+      form: 'gummy',
+      category: 'vitamins',
+      colorTag: 'amber',
+      frequencyType: 'daily',
+      duration: {
+        type: 'continuous',
+        startDate: dStartStr,
+      },
+      inventory: {
+        trackStock: true,
+        currentStock: 34,
+        bottleSize: 60,
+        unit: 'gummies',
+        lowStockThreshold: 10,
+        lastRestockedDate: dStartStr,
+      },
+      notes: 'Kids chewable vitamin bears with Vit C, D & Zinc. Fun and tasty with breakfast!',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'supp-kids-omega3-dha',
+      profileId: 'profile_kids',
+      name: 'Kids Smart DHA Omega-3 Gummy',
+      doseAmount: 1,
+      unit: 'capsules',
+      form: 'gummy',
+      category: 'omega',
+      colorTag: 'violet',
+      frequencyType: 'daily',
+      duration: {
+        type: 'continuous',
+        startDate: dStartStr,
+      },
+      inventory: {
+        trackStock: true,
+        currentStock: 28,
+        bottleSize: 45,
+        unit: 'gummies',
+        lowStockThreshold: 7,
+        lastRestockedDate: dStartStr,
+      },
+      notes: 'Brain and eye development DHA gummies. Citrus burst flavor.',
+      createdAt: new Date().toISOString(),
+    }
   ];
 }
 
@@ -354,18 +296,18 @@ export function getInitialLogs(): DoseLog[] {
   const logs: DoseLog[] = [];
   const today = new Date();
 
-  // Generate realistic past logs for the last 60 days
+  // Past logs for the last 60 days
   for (let i = 60; i >= 1; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     const dateStr = formatDateToYYYYMMDD(d);
     const dayOfWeek = d.getDay();
-    const dayOfMonth = d.getDate();
 
-    // Daily magnesium taken most evenings (88% adherence)
+    // Myself: Magnesium
     if (Math.random() > 0.12) {
       logs.push({
         id: `log-mag-${dateStr}`,
+        profileId: 'profile_self',
         supplementId: 'supp-magnesium-glycinate',
         supplementName: 'Magnesium Glycinate',
         amountTaken: 400,
@@ -377,10 +319,11 @@ export function getInitialLogs(): DoseLog[] {
       });
     }
 
-    // Daily Omega-3 taken most days (82% adherence)
+    // Myself: Omega-3
     if (Math.random() > 0.18) {
       logs.push({
         id: `log-omg-${dateStr}`,
+        profileId: 'profile_self',
         supplementId: 'supp-omega-3',
         supplementName: 'Omega-3 Fish Oil (EPA / DHA)',
         amountTaken: 1000,
@@ -392,53 +335,82 @@ export function getInitialLogs(): DoseLog[] {
       });
     }
 
-    // Weekly Vitamin D (on Mondays, dayOfWeek === 1, within last 8 weeks)
-    if (dayOfWeek === 1 && i <= 56) {
+    // Dad: CoQ10
+    if (Math.random() > 0.15) {
       logs.push({
-        id: `log-vitd-${dateStr}`,
-        supplementId: 'supp-vit-d-60k',
-        supplementName: 'Vitamin D3 (Cholecalciferol)',
-        amountTaken: 60000,
-        unit: 'IU',
-        timestamp: `${dateStr}T09:10:00.000Z`,
-        date: dateStr,
-        time: '09:10',
-        notes: 'Taken with breakfast',
-      });
-    }
-
-    // Weekly Vitamin B12 (on Mondays, dayOfWeek === 1)
-    if (dayOfWeek === 1) {
-      logs.push({
-        id: `log-b12-${dateStr}`,
-        supplementId: 'supp-vit-b12-1500',
-        supplementName: 'Vitamin B12 (Methylcobalamin)',
-        amountTaken: 1500,
+        id: `log-dad-coq10-${dateStr}`,
+        profileId: 'profile_dad',
+        supplementId: 'supp-dad-coq10',
+        supplementName: 'CoQ10 (Ubiquinol 100mg)',
+        amountTaken: 100,
         unit: 'mg',
-        timestamp: `${dateStr}T09:35:00.000Z`,
+        timestamp: `${dateStr}T08:30:00.000Z`,
         date: dateStr,
-        time: '09:35',
-        notes: 'Weekly Monday dose',
+        time: '08:30',
+        notes: 'Dad took with morning oatmeal',
       });
     }
 
-    // Monthly B-complex booster on the 1st
-    if (dayOfMonth === 1) {
+    // Kids: Gummy Multi
+    if (Math.random() > 0.10) {
       logs.push({
-        id: `log-bcomp-${dateStr}`,
-        supplementId: 'supp-monthly-b-complex',
-        supplementName: 'Monthly B-Complex Booster',
-        amountTaken: 1,
-        unit: 'tablets',
-        timestamp: `${dateStr}T10:05:00.000Z`,
+        id: `log-kid-multi-${dateStr}`,
+        profileId: 'profile_kids',
+        supplementId: 'supp-kids-multi-gummy',
+        supplementName: 'Kids Gummy Multivitamin',
+        amountTaken: 2,
+        unit: 'capsules',
+        timestamp: `${dateStr}T08:15:00.000Z`,
         date: dateStr,
-        time: '10:05',
-        notes: 'Monthly renewal booster',
+        time: '08:15',
+        notes: 'Earned morning star sticker! ⭐',
       });
     }
   }
 
   return logs;
+}
+
+export function loadProfiles(): UserProfile[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_PROFILES_KEY);
+    if (!raw) {
+      saveProfiles(INITIAL_PROFILES);
+      return INITIAL_PROFILES;
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return INITIAL_PROFILES;
+  } catch (e) {
+    console.error('Error loading profiles from storage', e);
+    return INITIAL_PROFILES;
+  }
+}
+
+export function saveProfiles(profiles: UserProfile[]) {
+  try {
+    localStorage.setItem(STORAGE_PROFILES_KEY, JSON.stringify(profiles));
+  } catch (e) {
+    console.error('Error saving profiles to storage', e);
+  }
+}
+
+export function loadActiveProfileId(): string {
+  try {
+    return localStorage.getItem(STORAGE_ACTIVE_PROFILE_KEY) || 'profile_self';
+  } catch {
+    return 'profile_self';
+  }
+}
+
+export function saveActiveProfileId(id: string) {
+  try {
+    localStorage.setItem(STORAGE_ACTIVE_PROFILE_KEY, id);
+  } catch (e) {
+    console.error('Error saving active profile ID', e);
+  }
 }
 
 export function loadSupplements(): Supplement[] {
@@ -449,14 +421,12 @@ export function loadSupplements(): Supplement[] {
       saveSupplements(initial);
       return initial;
     }
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.map((s: Supplement) => ({
-        ...s,
-        profileId: s.profileId || 'profile_me',
-      }));
-    }
-    return getInitialSupplements();
+    const list: Supplement[] = JSON.parse(raw);
+    // Guarantee backwards-compatibility with older items lacking profileId
+    return list.map(item => ({
+      ...item,
+      profileId: item.profileId || 'profile_self',
+    }));
   } catch (e) {
     console.error('Error loading supplements from storage', e);
     return getInitialSupplements();
@@ -479,14 +449,11 @@ export function loadDoseLogs(): DoseLog[] {
       saveDoseLogs(initial);
       return initial;
     }
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.map((l: DoseLog) => ({
-        ...l,
-        profileId: l.profileId || 'profile_me',
-      }));
-    }
-    return getInitialLogs();
+    const list: DoseLog[] = JSON.parse(raw);
+    return list.map(log => ({
+      ...log,
+      profileId: log.profileId || 'profile_self',
+    }));
   } catch (e) {
     console.error('Error loading dose logs from storage', e);
     return getInitialLogs();
@@ -522,9 +489,6 @@ export function importBackupData(jsonString: string): { success: boolean; messag
     if (parsed.profiles && Array.isArray(parsed.profiles)) {
       saveProfiles(parsed.profiles);
     }
-    if (parsed.activeProfileId) {
-      saveActiveProfileId(parsed.activeProfileId);
-    }
     saveSupplements(parsed.supplements);
     if (parsed.logs && Array.isArray(parsed.logs)) {
       saveDoseLogs(parsed.logs);
@@ -536,12 +500,12 @@ export function importBackupData(jsonString: string): { success: boolean; messag
 }
 
 export function resetToDemoData() {
-  const profiles = getInitialProfiles();
   const supps = getInitialSupplements();
   const logs = getInitialLogs();
+  const profiles = INITIAL_PROFILES;
   saveProfiles(profiles);
-  saveActiveProfileId('profile_me');
+  saveActiveProfileId('profile_self');
   saveSupplements(supps);
   saveDoseLogs(logs);
-  return { profiles, supps, logs };
+  return { supps, logs, profiles };
 }

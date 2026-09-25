@@ -12,14 +12,15 @@ export function usePWAInstall() {
   const [isAndroid, setIsAndroid] = useState(false);
 
   useEffect(() => {
-    // Detect standalone mode (already installed)
+    // Detect standalone mode (already installed as PWA / APK / TWA)
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+      document.referrer.includes('android-app://');
     setIsInstalled(isStandalone);
 
-    // Detect OS
-    const userAgent = window.navigator.userAgent.toLowerCase();
+    // Detect mobile devices
+    const userAgent = (window.navigator.userAgent || '').toLowerCase();
     const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
     const isAndroidDevice = /android/.test(userAgent);
     setIsIOS(isIOSDevice);

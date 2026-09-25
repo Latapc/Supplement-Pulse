@@ -18,11 +18,13 @@ import {
   Repeat
 } from 'lucide-react';
 import { Supplement, TodaySupplementStatus, DayOfWeek } from '../types/supplement';
+import { UserProfile } from '../types/profile';
 import { getDayName } from '../utils/dates';
 
 interface SupplementCardProps {
   supplement: Supplement;
   status: TodaySupplementStatus;
+  profile?: UserProfile;
   onEdit: (supplement: Supplement) => void;
   onDelete: (supplementId: string) => void;
   onRenewCourse: (supplement: Supplement) => void;
@@ -33,6 +35,7 @@ interface SupplementCardProps {
 export const SupplementCard: React.FC<SupplementCardProps> = ({
   supplement,
   status,
+  profile,
   onEdit,
   onDelete,
   onRenewCourse,
@@ -87,6 +90,15 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
         {/* Top bar: Category & Status */}
         <div className="flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
+            {profile && (
+              <span 
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white flex items-center gap-1 shadow-2xs"
+                style={{ backgroundColor: profile.accentColor || '#10b981' }}
+              >
+                <span>{profile.avatar === 'heart' ? '♥' : profile.avatar === 'sparkles' ? '★' : '•'}</span>
+                <span>{profile.name}</span>
+              </span>
+            )}
             <span className="capitalize font-medium text-stone-700 dark:text-stone-300">
               {supplement.category} · {supplement.form}
             </span>

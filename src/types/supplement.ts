@@ -41,24 +41,9 @@ export interface ExpiryStatusInfo {
   badgeVariant: 'expired' | 'warning' | 'caution' | 'good' | 'none';
 }
 
-export type ProfileType = 'adult' | 'senior' | 'kid' | 'general';
-
-export interface UserProfile {
-  id: string; // e.g. 'profile_me', 'profile_dad', 'profile_kid'
-  name: string; // e.g. 'Neelam (Me)', 'Dad', 'Leo'
-  relationship: string; // 'Self' | 'Dad' | 'Mom' | 'Kid' | 'Partner' | 'Other'
-  type: ProfileType;
-  avatarIcon: string; // e.g. 'user', 'glasses', 'sparkles', 'heart', 'bear', 'star', 'rocket', 'shield', 'sun'
-  themeColor: string; // 'emerald' | 'sky' | 'amber' | 'rose' | 'indigo' | 'violet' | 'teal'
-  notes?: string; // e.g. "Senior daily wellness", "Children chewable vitamins"
-  birthYear?: number;
-  isKidsProfile?: boolean;
-  createdAt: string;
-}
-
 export interface Supplement {
   id: string;
-  profileId?: string; // Links supplement to specific profile (defaults to primary 'profile_me')
+  profileId?: string; // Links to UserProfile.id ('profile_self', 'profile_dad', 'profile_kids', etc.)
   name: string;
   doseAmount: number; // e.g. 60000, 1500
   unit: DoseUnit; // e.g. 'IU', 'mg'
@@ -93,7 +78,7 @@ export interface Supplement {
 
 export interface DoseLog {
   id: string;
-  profileId?: string; // Links log to profile
+  profileId?: string; // Associated UserProfile
   supplementId: string;
   supplementName: string;
   amountTaken: number;

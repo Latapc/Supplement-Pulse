@@ -1,32 +1,35 @@
 import React, { useState, useEffect } from 'react';
+import { Supplement } from '../types/supplement';
+import { UserProfile } from '../types/profile';
 import { 
-  Calendar as CalendarIcon, 
-  X, 
+  Calendar, 
+  CalendarCheck, 
+  Clock, 
   Check, 
   AlertCircle, 
-  RefreshCw, 
   ExternalLink, 
-  Trash2, 
-  Clock, 
+  RefreshCw, 
+  X, 
   ShieldCheck, 
-  Sparkles,
-  Info
+  Info,
+  CalendarDays,
+  Bell
 } from 'lucide-react';
-import { Supplement, UserProfile } from '../types/supplement';
 import { 
-  getSuppleTrackCalendarEvents, 
-  syncRegimenToCalendar, 
-  deleteCalendarEvent,
-  CalendarEventSummary 
-} from '../utils/googleCalendar';
-import { getCachedGoogleAccessToken, signInWithGoogle } from '../utils/googleDriveSync';
+  generateDoseEventProposals, 
+  syncDosesToCalendar, 
+  SyncDosePlan 
+} from '../utils/googleCalendarSync';
+import { getOAuthAccessToken, signInWithGoogle } from '../utils/googleDriveSync';
+import { playSuccessChime, triggerHaptic } from '../utils/soundEffects';
 
 interface GoogleCalendarModalProps {
   isOpen: boolean;
   onClose: () => void;
   supplements: Supplement[];
   profiles: UserProfile[];
-  activeProfile: UserProfile;
+  userEmail?: string | null;
+  onRefreshAuthState?: () => void;
 }
 
 export const GoogleCalendarModal: React.FC<GoogleCalendarModalProps> = ({
@@ -34,139 +37,104 @@ export const GoogleCalendarModal: React.FC<GoogleCalendarModalProps> = ({
   onClose,
   supplements,
   profiles,
-  activeProfile,
+  userEmail,
+  onRefreshAuthState,
 }) => {
-  const [token, setToken] = useState<string | null>(getCachedGoogleAccessToken());
-  const [events, setEvents] = useState<CalendarEventSummary[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; name: string } | null>(null);
-  const [syncResult, setSyncResult] = useState<{ added: number; existingDeleted: number } | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [daysAhead, setDaysAhead] = useState<number>(7);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number } | null>(null);
+  const [syncResult, setSyncResult] = useState<{ count: number; errorCount: number; message: string } | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  // User confirmation dialog states (mandatory for Workspace API per skill!)
-  const [confirmSyncOpen, setConfirmSyncOpen] = useState(false);
-  const [deleteEventTarget, setDeleteEventTarget] = useState<CalendarEventSummary | null>(null);
-
-  // Selected profile to sync (defaults to active profile)
-  const [selectedProfileId, setSelectedProfileId] = useState(activeProfile.id);
-
-  useEffect(() => {
-    if (isOpen) {
-      const currentTok = getCachedGoogleAccessToken();
-      setToken(currentTok);
-      if (currentTok) {
-        loadEvents(currentTok);
-      }
-    }
-  }, [isOpen]);
+  // Generate event preview
+  const plans: SyncDosePlan[] = React.useMemo(() => {
+    return generateDoseEventProposals(supplements, profiles, daysAhead);
+  }, [supplements, profiles, daysAhead]);
 
   if (!isOpen) return null;
 
-  const currentProfileObj = profiles.find((p) => p.id === selectedProfileId) || activeProfile;
-  const eligibleSupplements = supplements.filter(
-    (s) => !s.archived && (!s.profileId || s.profileId === currentProfileObj.id)
-  );
-
-  const handleSignIn = async () => {
-    setErrorMsg(null);
-    setLoading(true);
-    try {
-      const { accessToken } = await signInWithGoogle();
-      setToken(accessToken);
-      await loadEvents(accessToken);
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to authenticate with Google Calendar.');
-    } finally {
-      setLoading(false);
+  const handleStartSyncFlow = () => {
+    const token = getOAuthAccessToken();
+    if (!token && !userEmail) {
+      setAuthError('Please sign in with your Google Account first to authorize Google Calendar.');
+      return;
     }
+    setAuthError(null);
+    setShowConfirmation(true);
   };
 
-  const loadEvents = async (tok: string) => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const list = await getSuppleTrackCalendarEvents(tok);
-      setEvents(list);
-    } catch (err: any) {
-      if (err?.message?.includes('authorization expired') || err?.message?.includes('401')) {
-        setToken(null);
-      }
-      setErrorMsg(err?.message || 'Could not fetch calendar events.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const executeSync = async () => {
-    if (!token) return;
-    setConfirmSyncOpen(false);
-    setSyncing(true);
-    setErrorMsg(null);
+  const handleConfirmSync = async () => {
+    setShowConfirmation(false);
+    setIsSyncing(true);
     setSyncResult(null);
+    setAuthError(null);
 
     try {
-      const res = await syncRegimenToCalendar(
-        token,
-        supplements,
-        currentProfileObj,
-        (current, total, name) => {
-          setSyncProgress({ current, total, name });
-        }
-      );
-      setSyncResult(res);
-      await loadEvents(token);
+      let token = getOAuthAccessToken();
+      if (!token) {
+        // Re-authenticate if token lost
+        const res = await signInWithGoogle();
+        token = res.accessToken;
+        if (onRefreshAuthState) onRefreshAuthState();
+      }
+
+      if (!token) {
+        throw new Error('Google Calendar authorization token not found. Please click Sign in with Google.');
+      }
+
+      setSyncProgress({ current: 0, total: plans.length });
+
+      const result = await syncDosesToCalendar(token, plans, (current, total) => {
+        setSyncProgress({ current, total });
+      });
+
+      triggerHaptic('success');
+      playSuccessChime();
+
+      setSyncResult({
+        count: result.createdCount,
+        errorCount: result.errors.length,
+        message: result.errors.length === 0
+          ? `Successfully scheduled ${result.createdCount} supplement reminder events on your Google Calendar!`
+          : `Created ${result.createdCount} events with ${result.errors.length} notices.`,
+      });
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Error occurred while syncing with Google Calendar.');
+      triggerHaptic('medium');
+      setAuthError(err.message || 'Failed to sync with Google Calendar.');
     } finally {
-      setSyncing(false);
+      setIsSyncing(false);
       setSyncProgress(null);
     }
   };
 
-  const executeDelete = async (event: CalendarEventSummary) => {
-    if (!token) return;
-    setDeleteEventTarget(null);
-    setLoading(true);
-    setErrorMsg(null);
-
-    try {
-      await deleteCalendarEvent(token, event.id);
-      setEvents((prev) => prev.filter((e) => e.id !== event.id));
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to delete calendar event.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-md animate-fadeIn">
       <div 
         className="w-full max-w-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-stone-100 dark:border-stone-800 flex items-center justify-between bg-stone-50/70 dark:bg-stone-900/50">
+        <div className="px-6 py-5 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between bg-gradient-to-r from-blue-50/70 via-stone-50 to-stone-50 dark:from-blue-950/20 dark:via-stone-900 dark:to-stone-900">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <CalendarIcon className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-stone-900 dark:text-white flex items-center gap-2">
-                Google Calendar Integration
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                  Real-Time Sync
+              <h2 className="text-xl font-bold font-syne text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                Google Calendar Sync
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  Workspace
                 </span>
               </h2>
               <p className="text-xs text-stone-500 dark:text-stone-400">
-                Sync dose reminders, food timings & cycling protocols directly into your Google Calendar
+                Sync scheduled supplement doses directly to your Google Calendar
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition"
+            className="p-2 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-200/50 dark:hover:bg-stone-800 transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -174,286 +142,210 @@ export const GoogleCalendarModal: React.FC<GoogleCalendarModalProps> = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-6">
-          {errorMsg && (
-            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-3 font-medium">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {/* Sync Progress / Success banner */}
-          {syncResult && (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500" />
-                <span>
-                  Successfully created <strong>{syncResult.added}</strong> recurring reminder events on your Google Calendar!
-                </span>
+          {/* Account & Permission Banner */}
+          <div className="p-4 rounded-2xl bg-stone-100 dark:bg-[#231f1c] border border-stone-200 dark:border-stone-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-500 text-white flex items-center justify-center font-bold text-sm">
+                G
               </div>
+              <div>
+                <p className="text-xs text-stone-600 dark:text-stone-300 font-medium">Google Account</p>
+                <p className="text-sm font-bold text-stone-900 dark:text-white">
+                  {userEmail || 'Not Connected (Sign in below)'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
               <a
                 href="https://calendar.google.com"
                 target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 font-bold underline hover:text-emerald-800 dark:hover:text-emerald-200"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 text-xs font-medium hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center gap-1.5 transition"
               >
-                Open Google Calendar <ExternalLink className="w-3 h-3" />
+                <span>Open Google Calendar</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </a>
+            </div>
+          </div>
+
+          {/* Sync Success / Result Toast */}
+          {syncResult && (
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 dark:text-emerald-200 flex items-start gap-3 animate-fadeIn">
+              <CalendarCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-sm">Synchronization Complete</h4>
+                <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+                  {syncResult.message}
+                </p>
+              </div>
             </div>
           )}
 
-          {!token ? (
-            /* Auth Required State */
-            <div className="text-center py-8 px-4 border border-stone-200 dark:border-stone-800 rounded-2xl bg-stone-50/50 dark:bg-stone-900/40 space-y-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
-                <CalendarIcon className="w-8 h-8" />
-              </div>
+          {/* Error Banner */}
+          {authError && (
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-900 dark:text-rose-200 flex items-start gap-3 animate-fadeIn">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-bold text-base text-stone-900 dark:text-white">
-                  Connect your Google Calendar
-                </h3>
-                <p className="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto mt-1">
-                  Authorize SuppleTrack to create recurring supplement reminder events with dosage instructions, food timing, and 10-minute notifications.
+                <h4 className="font-semibold text-sm">Calendar Notice</h4>
+                <p className="text-xs text-rose-700 dark:text-rose-300 mt-0.5">
+                  {authError}
                 </p>
               </div>
+            </div>
+          )}
 
-              <div className="pt-2">
+          {/* Schedule Config Range */}
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-blue-600" />
+              <span>Dose Horizon to Schedule</span>
+            </label>
+            <div className="flex items-center gap-1.5 bg-stone-100 dark:bg-stone-800 p-1 rounded-xl">
+              {[3, 7, 14, 30].map(days => (
                 <button
-                  onClick={handleSignIn}
-                  disabled={loading}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md transition disabled:opacity-50"
+                  key={days}
+                  onClick={() => setDaysAhead(days)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                    daysAhead === days
+                      ? 'bg-white dark:bg-stone-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-stone-600 dark:text-stone-400 hover:text-stone-900'
+                  }`}
                 >
-                  {loading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Connecting with Google...
-                    </>
-                  ) : (
-                    <>
-                      <CalendarIcon className="w-4 h-4" />
-                      Connect Google Calendar
-                    </>
-                  )}
+                  {days} Days
                 </button>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div className="text-[11px] text-stone-400 flex items-center justify-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Authorized via OAuth scope: <code>calendar.events</code></span>
+          {/* Preview of Events to be Created */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-stone-500 dark:text-stone-400">
+              <span className="font-semibold text-stone-700 dark:text-stone-300">
+                Scheduled Events Preview ({plans.length} upcoming doses)
+              </span>
+              <span>Sorted by timing & profile</span>
+            </div>
+
+            <div className="max-h-56 overflow-y-auto space-y-2 rounded-2xl border border-stone-200 dark:border-stone-800 p-3 bg-stone-50/50 dark:bg-stone-900/50">
+              {plans.length === 0 ? (
+                <p className="text-xs text-center py-6 text-stone-400">
+                  No active supplements scheduled for this period.
+                </p>
+              ) : (
+                plans.slice(0, 15).map((plan, idx) => (
+                  <div
+                    key={`${plan.supplement.id}-${plan.dateStr}-${idx}`}
+                    className="p-2.5 rounded-xl bg-white dark:bg-stone-800 border border-stone-200/70 dark:border-stone-700/70 flex items-center justify-between text-xs shadow-xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: plan.profile.accentColor }} />
+                      <div>
+                        <span className="font-semibold text-stone-900 dark:text-stone-100">
+                          {plan.supplement.name}
+                        </span>
+                        <span className="ml-1.5 text-stone-400 dark:text-stone-400">
+                          ({plan.supplement.doseAmount} {plan.supplement.unit})
+                        </span>
+                        <span className="ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-300">
+                          {plan.profile.name}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 font-mono text-[11px] text-stone-500 dark:text-stone-400">
+                      <span>{plan.dateStr}</span>
+                      <span className="font-bold text-stone-700 dark:text-stone-300">{plan.timeStr}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+              {plans.length > 15 && (
+                <p className="text-[11px] text-center text-stone-400 py-1">
+                  + {plans.length - 15} additional scheduled doses
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Sync Progress Bar */}
+          {syncProgress && (
+            <div className="space-y-1.5 animate-fadeIn">
+              <div className="flex justify-between text-xs text-stone-600 dark:text-stone-400">
+                <span>Syncing doses to Google Calendar...</span>
+                <span>{syncProgress.current} / {syncProgress.total}</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-stone-200 dark:bg-stone-800 overflow-hidden">
+                <div 
+                  className="h-full bg-blue-600 transition-all duration-200"
+                  style={{ width: `${(syncProgress.current / syncProgress.total) * 100}%` }}
+                />
               </div>
             </div>
-          ) : (
-            /* Authorized / Sync Control State */
-            <div className="space-y-6">
-              {/* Profile Picker for Sync */}
-              <div className="p-4 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50/40 dark:bg-stone-900/40 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-stone-700 dark:text-stone-300">
-                    Select Profile Regimen to Sync:
-                  </span>
-                  <select
-                    value={selectedProfileId}
-                    onChange={(e) => setSelectedProfileId(e.target.value)}
-                    className="px-3 py-1.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 text-stone-900 dark:text-white"
-                  >
-                    {profiles.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.relationship})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          )}
 
-                <div className="text-xs text-stone-500 dark:text-stone-400 flex items-center justify-between">
-                  <span>
-                    <strong>{eligibleSupplements.length}</strong> active supplements configured for {currentProfileObj.name}
-                  </span>
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                    Includes dose times, food instructions & reminders
-                  </span>
-                </div>
+          {/* Confirmation Dialog (Mandatory for Workspace Integration) */}
+          {showConfirmation && (
+            <div className="p-4 rounded-2xl bg-blue-500/10 border-2 border-blue-500/40 text-blue-950 dark:text-blue-100 space-y-3 animate-fadeIn">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <ShieldCheck className="w-5 h-5 text-blue-600" />
+                <span>Confirm Google Calendar Synchronization</span>
               </div>
-
-              {/* Sync Action Area */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-500/20">
-                <div className="space-y-1 text-center sm:text-left">
-                  <h4 className="font-bold text-sm text-stone-900 dark:text-white flex items-center gap-1.5 justify-center sm:justify-start">
-                    <Sparkles className="w-4 h-4 text-emerald-500" />
-                    Push Regimen to Google Calendar
-                  </h4>
-                  <p className="text-xs text-stone-500 dark:text-stone-400">
-                    Creates daily or weekly recurring events with pop-up alarms 10 mins prior.
-                  </p>
-                </div>
-
+              <p className="text-xs text-blue-900/80 dark:text-blue-200/80">
+                Are you sure you want to add <strong>{plans.length}</strong> supplement dose reminder events to your primary Google Calendar ({userEmail})?
+              </p>
+              <div className="flex items-center gap-2 pt-1">
                 <button
-                  onClick={() => setConfirmSyncOpen(true)}
-                  disabled={syncing || eligibleSupplements.length === 0}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition disabled:opacity-50 shrink-0"
+                  type="button"
+                  onClick={handleConfirmSync}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition shadow-sm"
                 >
-                  {syncing ? (
-                    <span className="flex items-center gap-2 justify-center">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      Syncing... ({syncProgress?.current || 0}/{syncProgress?.total || eligibleSupplements.length})
-                    </span>
-                  ) : (
-                    'Sync to Google Calendar'
-                  )}
+                  Yes, Add Events to Google Calendar
                 </button>
-              </div>
-
-              {/* Existing Calendar Events on User's Calendar */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
-                    Synced SuppleTrack Events ({events.length})
-                  </h4>
-                  <button
-                    onClick={() => loadEvents(token)}
-                    disabled={loading}
-                    className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline flex items-center gap-1"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
-                  </button>
-                </div>
-
-                {events.length === 0 ? (
-                  <div className="text-center py-6 border border-stone-200 dark:border-stone-800 rounded-xl text-stone-400 text-xs">
-                    No SuppleTrack events found on your Google Calendar yet. Tap "Sync to Google Calendar" above to create them.
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {events.map((ev) => (
-                      <div
-                        key={ev.id}
-                        className="p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex items-center justify-between text-xs"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Clock className="w-4 h-4 text-emerald-500 shrink-0" />
-                          <div className="min-w-0">
-                            <span className="font-semibold text-stone-900 dark:text-white truncate block">
-                              {ev.summary}
-                            </span>
-                            <span className="text-[11px] text-stone-500 dark:text-stone-400">
-                              Recurring event with 10-min alerts
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                          {ev.htmlLink && (
-                            <a
-                              href={ev.htmlLink}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition"
-                              title="View in Google Calendar"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-                          <button
-                            onClick={() => setDeleteEventTarget(ev)}
-                            className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
-                            title="Remove event"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmation(false)}
+                  className="px-3 py-2 text-stone-600 dark:text-stone-400 hover:text-stone-900 text-xs"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Confirmation Modal for Syncing (Workspace Guideline Compliance) */}
-        {confirmSyncOpen && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-              <div className="flex items-center gap-3 text-amber-500">
-                <AlertCircle className="w-6 h-6" />
-                <h3 className="font-bold text-stone-900 dark:text-white text-base">
-                  Confirm Calendar Sync
-                </h3>
-              </div>
-              <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed">
-                This will create <strong>{eligibleSupplements.length}</strong> recurring supplement dose reminder events on your primary Google Calendar for <strong>{currentProfileObj.name}</strong>.
-                Any prior SuppleTrack events for this profile will be updated to reflect current dosages.
-              </p>
-              <div className="p-3 rounded-xl bg-stone-100 dark:bg-stone-800 text-[11px] text-stone-600 dark:text-stone-300 space-y-1">
-                <div>• Calendar: Primary Account Calendar</div>
-                <div>• Notifications: Google Calendar pop-up alerts 10m before each dose</div>
-                <div>• Profile: {currentProfileObj.name} ({currentProfileObj.relationship})</div>
-              </div>
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  onClick={() => setConfirmSyncOpen(false)}
-                  className="px-4 py-2 rounded-xl text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 text-xs font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={executeSync}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md"
-                >
-                  Yes, Sync to Calendar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Confirmation Modal for Event Deletion (Workspace Guideline Compliance) */}
-        {deleteEventTarget && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-              <div className="flex items-center gap-3 text-rose-500">
-                <Trash2 className="w-6 h-6" />
-                <h3 className="font-bold text-stone-900 dark:text-white text-base">
-                  Remove Calendar Reminder?
-                </h3>
-              </div>
-              <p className="text-xs text-stone-600 dark:text-stone-300">
-                Are you sure you want to delete <strong>{deleteEventTarget.summary}</strong> from your Google Calendar?
-              </p>
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  onClick={() => setDeleteEventTarget(null)}
-                  className="px-4 py-2 rounded-xl text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 text-xs font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => executeDelete(deleteEventTarget)}
-                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md"
-                >
-                  Delete Event
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Footer */}
-        <div className="p-4 bg-stone-50/50 dark:bg-stone-900/40 border-t border-stone-100 dark:border-stone-800 text-xs text-stone-500 dark:text-stone-400 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <a
-              href="https://calendar.google.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline flex items-center gap-1"
-            >
-              Open Google Calendar <ExternalLink className="w-3 h-3" />
-            </a>
+        <div className="px-6 py-4 bg-stone-100 dark:bg-[#231f1c] border-t border-stone-200 dark:border-stone-700 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-300 font-medium">
+            <Bell className="w-3.5 h-3.5 text-blue-500" />
+            <span>Includes 10-minute pop-up reminders</span>
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-stone-200 dark:bg-stone-800 text-stone-800 dark:text-stone-200 font-semibold hover:bg-stone-300 dark:hover:bg-stone-700 transition"
-          >
-            Close
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900"
+            >
+              Close
+            </button>
+            <button
+              onClick={handleStartSyncFlow}
+              disabled={isSyncing || plans.length === 0}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs transition flex items-center gap-2 shadow-sm"
+            >
+              {isSyncing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Syncing...</span>
+                </>
+              ) : (
+                <>
+                  <CalendarCheck className="w-4 h-4" />
+                  <span>Sync {plans.length} Doses to Google Calendar</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

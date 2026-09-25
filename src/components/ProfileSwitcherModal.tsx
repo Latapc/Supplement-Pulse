@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
+import { UserProfile, ProfileType } from '../types/profile';
 import { 
   Users, 
+  User, 
+  Heart, 
+  Sparkles, 
+  ShieldAlert, 
   Plus, 
   Check, 
   X, 
-  Trash2, 
+  Lock, 
+  Unlock, 
   Edit3, 
-  Sparkles, 
-  User, 
-  Smile, 
-  Heart, 
-  ShieldCheck, 
-  Baby, 
-  Eye, 
-  Sliders
+  Trash2,
+  Tv,
+  Star
 } from 'lucide-react';
-import { UserProfile, ProfileType } from '../types/supplement';
+import { triggerHaptic, playSuccessChime } from '../utils/soundEffects';
 
 interface ProfileSwitcherModalProps {
   isOpen: boolean;
@@ -23,32 +24,9 @@ interface ProfileSwitcherModalProps {
   profiles: UserProfile[];
   activeProfileId: string;
   onSelectProfile: (profileId: string) => void;
-  onAddProfile: (profile: Omit<UserProfile, 'id' | 'createdAt'>) => void;
-  onUpdateProfile: (profile: UserProfile) => void;
-  onDeleteProfile: (profileId: string) => void;
-  allFamilyMode: boolean;
-  onToggleAllFamilyMode: (enabled: boolean) => void;
-  supplementCountByProfile: Record<string, number>;
+  onSaveProfiles: (profiles: UserProfile[]) => void;
+  onDeleteProfile?: (profileId: string) => void;
 }
-
-const AVATAR_OPTIONS = [
-  { key: 'user', label: 'Person', icon: User, color: 'bg-emerald-500' },
-  { key: 'glasses', label: 'Senior / Glasses', icon: Eye, color: 'bg-sky-500' },
-  { key: 'heart', label: 'Caring / Heart', icon: Heart, color: 'bg-rose-500' },
-  { key: 'bear', label: 'Kids / Bear', icon: Smile, color: 'bg-amber-500' },
-  { key: 'sparkles', label: 'Vitality / Sparkle', icon: Sparkles, color: 'bg-violet-500' },
-  { key: 'baby', label: 'Toddler / Child', icon: Baby, color: 'bg-pink-500' },
-  { key: 'shield', label: 'Wellness Shield', icon: ShieldCheck, color: 'bg-teal-500' },
-];
-
-const THEME_COLORS = [
-  { key: 'emerald', bg: 'bg-emerald-500', ring: 'ring-emerald-500', name: 'Emerald' },
-  { key: 'sky', bg: 'bg-sky-500', ring: 'ring-sky-500', name: 'Sky Blue' },
-  { key: 'amber', bg: 'bg-amber-500', ring: 'ring-amber-500', name: 'Amber' },
-  { key: 'rose', bg: 'bg-rose-500', ring: 'ring-rose-500', name: 'Rose' },
-  { key: 'violet', bg: 'bg-violet-500', ring: 'ring-violet-500', name: 'Violet' },
-  { key: 'teal', bg: 'bg-teal-500', ring: 'ring-teal-500', name: 'Teal' },
-];
 
 export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   isOpen,
@@ -56,428 +34,473 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   profiles,
   activeProfileId,
   onSelectProfile,
-  onAddProfile,
-  onUpdateProfile,
+  onSaveProfiles,
   onDeleteProfile,
-  allFamilyMode,
-  onToggleAllFamilyMode,
-  supplementCountByProfile,
 }) => {
+  const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [pinPromptForProfile, setPinPromptForProfile] = useState<UserProfile | null>(null);
+  const [enteredPin, setEnteredPin] = useState('');
+  const [pinError, setPinError] = useState(false);
 
-  // Form fields
-  const [name, setName] = useState('');
-  const [relationship, setRelationship] = useState('Dad');
-  const [profileType, setProfileType] = useState<ProfileType>('senior');
-  const [avatarIcon, setAvatarIcon] = useState('glasses');
-  const [themeColor, setThemeColor] = useState('sky');
-  const [notes, setNotes] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  // Form state
+  const [formName, setFormName] = useState('');
+  const [formType, setFormType] = useState<ProfileType>('adult');
+  const [formRelation, setFormRelation] = useState('');
+  const [formAvatar, setFormAvatar] = useState('user');
+  const [formNotes, setFormNotes] = useState('');
+  const [formPin, setFormPin] = useState('');
 
   if (!isOpen) return null;
 
-  const resetForm = () => {
-    setName('');
-    setRelationship('Self');
-    setProfileType('adult');
-    setAvatarIcon('user');
-    setThemeColor('emerald');
-    setNotes('');
-    setErrorMsg('');
-    setIsCreating(false);
-    setEditingProfileId(null);
+  const getAvatarIcon = (avatar: string, type: ProfileType, className: string = 'w-7 h-7') => {
+    if (avatar === 'heart' || type === 'assisted') return <Heart className={className} />;
+    if (avatar === 'sparkles' || type === 'kid') return <Sparkles className={className} />;
+    if (avatar === 'star') return <Star className={className} />;
+    return <User className={className} />;
   };
 
-  const startCreate = () => {
-    setName('');
-    setRelationship('Dad');
-    setProfileType('senior');
-    setAvatarIcon('glasses');
-    setThemeColor('sky');
-    setNotes('');
-    setErrorMsg('');
+  const handleStartCreate = () => {
     setIsCreating(true);
-    setEditingProfileId(null);
+    setEditingProfile(null);
+    setFormName('');
+    setFormType('adult');
+    setFormRelation('Family Member');
+    setFormAvatar('user');
+    setFormNotes('');
+    setFormPin('');
   };
 
-  const startEdit = (p: UserProfile, e: React.MouseEvent) => {
+  const handleStartEdit = (profile: UserProfile, e: React.MouseEvent) => {
     e.stopPropagation();
-    setName(p.name);
-    setRelationship(p.relationship);
-    setProfileType(p.type);
-    setAvatarIcon(p.avatarIcon);
-    setThemeColor(p.themeColor);
-    setNotes(p.notes || '');
-    setErrorMsg('');
-    setEditingProfileId(p.id);
     setIsCreating(false);
+    setEditingProfile(profile);
+    setFormName(profile.name);
+    setFormType(profile.type);
+    setFormRelation(profile.relation);
+    setFormAvatar(profile.avatar);
+    setFormNotes(profile.notes || '');
+    setFormPin(profile.pinCode || '');
   };
 
-  const handleSave = () => {
-    if (!name.trim()) {
-      setErrorMsg('Please enter a profile name.');
-      return;
-    }
+  const handleSaveForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim()) return;
+
+    triggerHaptic('success');
+    playSuccessChime();
 
     if (isCreating) {
-      onAddProfile({
-        name: name.trim(),
-        relationship,
-        type: profileType,
-        avatarIcon,
-        themeColor,
-        notes: notes.trim() || undefined,
-        isKidsProfile: profileType === 'kid',
+      const newId = `profile_${Date.now()}`;
+      const newProfile: UserProfile = {
+        id: newId,
+        name: formName.trim(),
+        type: formType,
+        relation: formRelation.trim() || (formType === 'kid' ? 'Kids Profile' : formType === 'assisted' ? 'Assisted Care' : 'Adult Member'),
+        avatar: formAvatar,
+        themeGradient: formType === 'kid' 
+          ? 'from-amber-400 via-rose-400 to-purple-500' 
+          : formType === 'assisted' 
+          ? 'from-blue-600 to-indigo-800' 
+          : 'from-emerald-500 to-teal-700',
+        accentColor: formType === 'kid' ? '#f43f5e' : formType === 'assisted' ? '#3b82f6' : '#10b981',
+        isPrimary: false,
+        pinCode: formType === 'kid' ? (formPin || '1234') : undefined,
+        calendarColorId: formType === 'kid' ? '5' : formType === 'assisted' ? '9' : '10',
+        notes: formNotes.trim(),
+      };
+      const updated = [...profiles, newProfile];
+      onSaveProfiles(updated);
+      onSelectProfile(newId);
+    } else if (editingProfile) {
+      const updated = profiles.map(p => {
+        if (p.id === editingProfile.id) {
+          return {
+            ...p,
+            name: formName.trim(),
+            type: formType,
+            relation: formRelation.trim(),
+            avatar: formAvatar,
+            notes: formNotes.trim(),
+            pinCode: formType === 'kid' ? (formPin || '1234') : undefined,
+          };
+        }
+        return p;
       });
-      resetForm();
-    } else if (editingProfileId) {
-      const existing = profiles.find((p) => p.id === editingProfileId);
-      if (existing) {
-        onUpdateProfile({
-          ...existing,
-          name: name.trim(),
-          relationship,
-          type: profileType,
-          avatarIcon,
-          themeColor,
-          notes: notes.trim() || undefined,
-          isKidsProfile: profileType === 'kid',
-        });
-      }
-      resetForm();
+      onSaveProfiles(updated);
     }
+
+    setEditingProfile(null);
+    setIsCreating(false);
   };
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (profiles.length <= 1) {
-      alert('You cannot delete the only remaining profile.');
+  const handleProfileClick = (profile: UserProfile) => {
+    const currentActive = profiles.find(p => p.id === activeProfileId);
+    if (currentActive?.type === 'kid' && currentActive.pinCode && profile.id !== currentActive.id) {
+      setPinPromptForProfile(profile);
+      setEnteredPin('');
+      setPinError(false);
       return;
     }
-    if (confirm('Are you sure you want to remove this profile? Its supplement logs will remain preserved.')) {
-      onDeleteProfile(id);
-      if (editingProfileId === id) resetForm();
-    }
+
+    triggerHaptic('light');
+    onSelectProfile(profile.id);
+    onClose();
   };
 
-  const getProfileBgClass = (color: string) => {
-    switch (color) {
-      case 'sky': return 'from-sky-500 to-blue-600';
-      case 'amber': return 'from-amber-500 to-orange-600';
-      case 'rose': return 'from-rose-500 to-red-600';
-      case 'violet': return 'from-violet-500 to-purple-600';
-      case 'teal': return 'from-teal-500 to-cyan-600';
-      default: return 'from-emerald-500 to-teal-600';
+  const handleUnlockPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const currentActive = profiles.find(p => p.id === activeProfileId);
+    if (enteredPin === currentActive?.pinCode || enteredPin === '1234') {
+      triggerHaptic('success');
+      if (pinPromptForProfile) {
+        onSelectProfile(pinPromptForProfile.id);
+      }
+      setPinPromptForProfile(null);
+      onClose();
+    } else {
+      triggerHaptic('medium');
+      setPinError(true);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
       <div 
-        className="w-full max-w-2xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl bg-white dark:bg-[#1a1714] border border-stone-300 dark:border-stone-700 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+        onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="p-6 border-b border-stone-100 dark:border-stone-800 flex items-center justify-between bg-stone-50/70 dark:bg-stone-900/50">
+        {/* Header - Google TV Style */}
+        <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between bg-stone-100 dark:bg-[#231f1c]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <Users className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+              <Tv className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-stone-900 dark:text-white">
-                {isCreating ? 'Add Family Profile' : editingProfileId ? 'Edit Profile' : 'Who is taking supplements?'}
+              <h2 className="text-lg sm:text-xl font-bold font-syne text-stone-900 dark:text-white">
+                Who's Taking Supplements?
               </h2>
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                {isCreating || editingProfileId 
-                  ? 'Manage supplement schedules, dose reminders & dietary profiles'
-                  : 'Switch between personal, parents, and kids regimens on one account'}
+              <p className="text-xs text-stone-600 dark:text-stone-300 font-medium">
+                Google TV-style family & care profiles under your same Google Account
               </p>
             </div>
           </div>
           <button
-            onClick={() => { resetForm(); onClose(); }}
-            className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition"
+            onClick={onClose}
+            className="p-2 rounded-xl text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-white hover:bg-stone-200 dark:hover:bg-stone-800 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
-          {/* Main Profiles Grid (Google TV Style) */}
-          {!isCreating && !editingProfileId ? (
-            <>
-              {/* Family Overview Toggle Banner */}
-              <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
-                    ALL
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-stone-900 dark:text-white">
-                      Family Combined Overview
-                    </h4>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">
-                      View all family members' supplements together on Today's board (great for giving Dad his pills!)
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => onToggleAllFamilyMode(!allFamilyMode)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                    allFamilyMode
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200'
-                  }`}
-                >
-                  {allFamilyMode ? 'Active on Board' : 'Enable'}
-                </button>
+        {/* Content Area */}
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 bg-white dark:bg-[#1a1714]">
+          {/* PIN Lock Prompt if trying to exit Kids profile */}
+          {pinPromptForProfile && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-500/50 text-amber-950 dark:text-amber-100 space-y-3">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <span>Parental Control PIN Required</span>
               </div>
+              <p className="text-xs text-amber-850 dark:text-amber-200 font-medium">
+                Enter your 4-digit PIN to exit Kids Profile (Default PIN is 1234).
+              </p>
+              <form onSubmit={handleUnlockPin} className="flex gap-2">
+                <input
+                  type="password"
+                  maxLength={4}
+                  value={enteredPin}
+                  onChange={e => {
+                    setEnteredPin(e.target.value);
+                    setPinError(false);
+                  }}
+                  placeholder="PIN"
+                  className={`w-28 px-3 py-2 text-center text-lg tracking-widest font-mono rounded-xl bg-white dark:bg-stone-800 border ${
+                    pinError ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-stone-300 dark:border-stone-600'
+                  } text-stone-900 dark:text-white font-bold`}
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                >
+                  Unlock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPinPromptForProfile(null)}
+                  className="px-3 py-2 text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+              </form>
+              {pinError && (
+                <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">
+                  Incorrect PIN. Try 1234 or your configured code.
+                </p>
+              )}
+            </div>
+          )}
 
-              {/* Profiles Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {profiles.map((p) => {
-                  const isActive = !allFamilyMode && activeProfileId === p.id;
-                  const count = supplementCountByProfile[p.id] || 0;
-
+          {/* Profile Cards Grid - Google TV Aesthetic */}
+          {!editingProfile && !isCreating && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                {profiles.map(profile => {
+                  const isActive = profile.id === activeProfileId;
                   return (
                     <div
-                      key={p.id}
-                      onClick={() => {
-                        onToggleAllFamilyMode(false);
-                        onSelectProfile(p.id);
-                        onClose();
-                      }}
-                      className={`group relative p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
+                      key={profile.id}
+                      onClick={() => handleProfileClick(profile)}
+                      className={`group relative p-4 sm:p-5 rounded-3xl cursor-pointer transition-all duration-200 flex flex-col items-center text-center border-2 ${
                         isActive
-                          ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-md ring-2 ring-emerald-500/30'
-                          : 'border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:border-stone-400 dark:hover:border-stone-700 hover:shadow'
+                          ? 'border-emerald-500 bg-emerald-50/90 dark:bg-emerald-950/60 shadow-lg shadow-emerald-500/10 ring-4 ring-emerald-500/20'
+                          : 'border-stone-300 dark:border-stone-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-stone-50 dark:bg-[#25211e] hover:scale-[1.02]'
                       }`}
                     >
-                      {/* Active indicator check */}
+                      {/* Active Checkmark Pill */}
                       {isActive && (
-                        <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-extrabold flex items-center gap-1 shadow-xs">
+                          <Check className="w-3 h-3 stroke-[3]" /> ACTIVE
                         </div>
                       )}
 
-                      <div className="flex items-start gap-4">
-                        {/* Big Colorful Avatar */}
-                        <div
-                          className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${getProfileBgClass(
-                            p.themeColor
-                          )} text-white flex items-center justify-center font-bold text-xl shadow-md shrink-0`}
-                        >
-                          {p.type === 'senior' ? (
-                            <Eye className="w-7 h-7" />
-                          ) : p.type === 'kid' ? (
-                            <Smile className="w-7 h-7" />
-                          ) : (
-                            <User className="w-7 h-7" />
-                          )}
-                        </div>
-
-                        {/* Profile Info */}
-                        <div className="flex-1 min-w-0 pr-6">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-base text-stone-900 dark:text-white truncate">
-                              {p.name}
-                            </h3>
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300">
-                              {p.relationship}
-                            </span>
-                          </div>
-
-                          <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 mt-1">
-                            {p.notes || `${p.type === 'kid' ? 'Kids gentle protocol' : p.type === 'senior' ? 'Senior wellness regimen' : 'Personal regimen'}`}
-                          </p>
-
-                          <div className="mt-3 flex items-center gap-2 text-xs font-medium text-stone-600 dark:text-stone-300">
-                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-                            <span>{count} {count === 1 ? 'supplement' : 'supplements'} tracked</span>
-                          </div>
-                        </div>
+                      {/* Profile Type Badge */}
+                      <div className="absolute top-3 left-3">
+                        {profile.type === 'kid' ? (
+                          <span className="px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-900/60 text-pink-700 dark:text-pink-200 text-[10px] font-bold flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" /> KIDS
+                          </span>
+                        ) : profile.type === 'assisted' ? (
+                          <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-200 text-[10px] font-bold flex items-center gap-1">
+                            <Heart className="w-3 h-3" /> SENIOR
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-200 text-[10px] font-bold">
+                            PRIMARY
+                          </span>
+                        )}
                       </div>
 
-                      {/* Edit button */}
-                      <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-xs text-stone-400">
-                        <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 group-hover:underline">
-                          {isActive ? 'Current Active Profile' : 'Tap to Switch Profile'}
-                        </span>
-                        <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
-                          <button
-                            onClick={(e) => startEdit(p, e)}
-                            className="p-1.5 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 transition"
-                            title="Edit profile"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          {profiles.length > 1 && (
-                            <button
-                              onClick={(e) => handleDelete(p.id, e)}
-                              className="p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-950/40 text-stone-400 hover:text-rose-600 transition"
-                              title="Delete profile"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
+                      {/* Avatar Circle */}
+                      <div className={`mt-5 w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-gradient-to-tr ${profile.themeGradient} text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-200`}>
+                        {getAvatarIcon(profile.avatar, profile.type, 'w-9 h-9 sm:w-10 sm:h-10')}
+                      </div>
+
+                      {/* Profile Info */}
+                      <h3 className="mt-3.5 text-base sm:text-lg font-bold text-stone-900 dark:text-white">
+                        {profile.name}
+                      </h3>
+                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">
+                        {profile.relation}
+                      </p>
+
+                      {profile.notes && (
+                        <p className="mt-2 text-xs font-medium text-stone-700 dark:text-stone-200 line-clamp-2 px-1 leading-relaxed">
+                          {profile.notes}
+                        </p>
+                      )}
+
+                      {/* Edit Button */}
+                      <div className="mt-4 pt-3 w-full border-t border-stone-200 dark:border-stone-700 flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={e => handleStartEdit(profile, e)}
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-stone-800 dark:text-stone-100 bg-stone-200/80 hover:bg-stone-300 dark:bg-[#342f2a] dark:hover:bg-[#423c36] flex items-center gap-1.5 transition"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+                        </button>
                       </div>
                     </div>
                   );
                 })}
+              </div>
 
-                {/* Add Profile Card */}
+              {/* Add New Profile Trigger */}
+              <div className="pt-1">
                 <button
-                  onClick={startCreate}
-                  className="p-6 rounded-2xl border-2 border-dashed border-stone-300 dark:border-stone-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/10 transition-all flex flex-col items-center justify-center text-center gap-2 min-h-[160px] group"
+                  type="button"
+                  onClick={handleStartCreate}
+                  className="w-full py-3.5 px-4 rounded-2xl border-2 border-dashed border-stone-300 dark:border-stone-600 hover:border-emerald-500 text-stone-800 dark:text-stone-100 hover:text-emerald-600 dark:hover:text-emerald-400 bg-stone-50 dark:bg-[#231f1c] flex items-center justify-center gap-2 font-bold text-sm transition"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-500 group-hover:bg-emerald-500 group-hover:text-white transition flex items-center justify-center">
-                    <Plus className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-stone-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
-                      Add Family Profile
-                    </h4>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">
-                      Add Dad, Mom, Kids, or Partner
-                    </p>
-                  </div>
+                  <Plus className="w-4 h-4 stroke-[3]" /> Add Another Family / Care Profile
                 </button>
               </div>
-            </>
-          ) : (
-            /* Create / Edit Form */
-            <div className="space-y-5">
-              {errorMsg && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
-                  {errorMsg}
-                </div>
-              )}
 
-              {/* Profile Name */}
+              {/* Information Footnote */}
+              <div className="p-4 rounded-2xl bg-stone-100 dark:bg-[#231f1c] border border-stone-200 dark:border-stone-700 text-xs text-stone-750 dark:text-stone-200 flex items-start gap-3">
+                <ShieldAlert className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold text-stone-900 dark:text-white text-xs">
+                    Shared Google Account Architecture
+                  </p>
+                  <p className="text-stone-700 dark:text-stone-300 leading-relaxed font-normal">
+                    Just like Google TV and YouTube Kids, all profiles are secured within your single Google Account. Dad's heart vitamins and kids' chewables stay neatly segregated while syncing seamlessly to Google Calendar and notifications!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Create / Edit Form */}
+          {(isCreating || editingProfile) && (
+            <form onSubmit={handleSaveForm} className="space-y-4 animate-fadeIn">
+              <div className="flex items-center justify-between pb-2 border-b border-stone-200 dark:border-stone-700">
+                <h3 className="font-bold text-stone-900 dark:text-white flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  {isCreating ? 'Create New Family Profile' : `Edit ${editingProfile?.name}`}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingProfile(null);
+                    setIsCreating(false);
+                  }}
+                  className="text-xs font-bold text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white"
+                >
+                  Cancel
+                </button>
+              </div>
+
               <div>
-                <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                <label className="block text-xs font-bold text-stone-800 dark:text-stone-200 mb-1">
                   Profile Name *
                 </label>
                 <input
                   type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Dad, Mom, Neelam, Leo"
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-stone-900 dark:text-white"
-                  autoFocus
+                  required
+                  placeholder="e.g. Dad, Mom, Junior, Myself"
+                  value={formName}
+                  onChange={e => setFormName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-900 dark:text-white text-sm font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
 
-              {/* Relationship & Category */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-                    Relationship
+                  <label className="block text-xs font-bold text-stone-800 dark:text-stone-200 mb-1">
+                    Profile Experience
                   </label>
                   <select
-                    value={relationship}
-                    onChange={(e) => {
-                      setRelationship(e.target.value);
-                      if (e.target.value === 'Dad' || e.target.value === 'Mom') {
-                        setProfileType('senior');
-                        setAvatarIcon('glasses');
-                      } else if (e.target.value === 'Kid' || e.target.value === 'Child') {
-                        setProfileType('kid');
-                        setAvatarIcon('bear');
-                      }
-                    }}
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-stone-900 dark:text-white"
+                    value={formType}
+                    onChange={e => setFormType(e.target.value as ProfileType)}
+                    className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-900 dark:text-white text-sm font-semibold"
                   >
-                    <option value="Self">Self (Me)</option>
-                    <option value="Dad">Dad</option>
-                    <option value="Mom">Mom</option>
-                    <option value="Kid">Kid / Child</option>
-                    <option value="Partner">Partner / Spouse</option>
-                    <option value="Other">Other Family Member</option>
+                    <option value="adult">Adult (Full View)</option>
+                    <option value="assisted">Senior / Assisted (Dad)</option>
+                    <option value="kid">Kids (Child-Safe Mode)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-                    Profile Type (Age / Mode)
+                  <label className="block text-xs font-bold text-stone-800 dark:text-stone-200 mb-1">
+                    Relation / Subtitle
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Senior / Assisted"
+                    value={formRelation}
+                    onChange={e => setFormRelation(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-900 dark:text-white text-sm font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-800 dark:text-stone-200 mb-1">
+                    Avatar Icon
                   </label>
                   <select
-                    value={profileType}
-                    onChange={(e) => setProfileType(e.target.value as ProfileType)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-stone-900 dark:text-white"
+                    value={formAvatar}
+                    onChange={e => setFormAvatar(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-900 dark:text-white text-sm font-semibold"
                   >
-                    <option value="adult">Adult</option>
-                    <option value="senior">Senior (High Contrast & Clear Timings)</option>
-                    <option value="kid">Kid (Playful & Gentle Reminders)</option>
-                    <option value="general">General</option>
+                    <option value="user">User Person</option>
+                    <option value="heart">Heart / Caregiver</option>
+                    <option value="sparkles">Sparkles / Kid</option>
+                    <option value="star">Star</option>
                   </select>
                 </div>
               </div>
 
-              {/* Theme Color */}
-              <div>
-                <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-2">
-                  Theme Accent Color
-                </label>
-                <div className="flex items-center gap-3">
-                  {THEME_COLORS.map((tc) => (
-                    <button
-                      key={tc.key}
-                      type="button"
-                      onClick={() => setThemeColor(tc.key)}
-                      className={`w-8 h-8 rounded-full ${tc.bg} transition-all ${
-                        themeColor === tc.key ? `ring-4 ${tc.ring} scale-110 shadow` : 'opacity-80 hover:opacity-100'
-                      }`}
-                      title={tc.name}
-                    />
-                  ))}
+              {formType === 'kid' && (
+                <div className="p-3.5 rounded-xl bg-pink-50 dark:bg-pink-950/40 border border-pink-300 dark:border-pink-800 text-pink-950 dark:text-pink-100 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-xs">
+                    <Lock className="w-4 h-4 text-pink-600 dark:text-pink-400" />
+                    <span>Parental Lock PIN</span>
+                  </div>
+                  <p className="text-xs text-pink-850 dark:text-pink-200 font-medium">
+                    Set a 4-digit code required to leave Kids Mode or edit regimens:
+                  </p>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="1234"
+                    value={formPin}
+                    onChange={e => setFormPin(e.target.value.replace(/\D/g, ''))}
+                    className="w-28 px-3 py-1.5 font-mono text-center tracking-widest text-sm rounded-lg bg-white dark:bg-stone-800 border border-pink-400 dark:border-pink-700 text-stone-900 dark:text-white font-bold"
+                  />
                 </div>
-              </div>
+              )}
 
-              {/* Health / Regimen Notes */}
               <div>
-                <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-                  Health Notes or Regimen Focus (Optional)
+                <label className="block text-xs font-bold text-stone-800 dark:text-stone-200 mb-1">
+                  Health & Care Notes
                 </label>
                 <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Senior blood pressure protocol, take with food, knee joint wellness..."
                   rows={2}
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-stone-900 dark:text-white"
+                  placeholder="e.g. Remind Dad to take with warm water after morning meal."
+                  value={formNotes}
+                  onChange={e => setFormNotes(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-stone-50 dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-900 dark:text-white text-sm font-medium"
                 />
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-100 dark:border-stone-800">
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-4 py-2 rounded-xl text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 text-sm font-semibold transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-md transition"
-                >
-                  {isCreating ? 'Create Profile' : 'Save Changes'}
-                </button>
+              <div className="flex items-center justify-between pt-3 border-t border-stone-200 dark:border-stone-700">
+                {editingProfile && !editingProfile.isPrimary && onDeleteProfile ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Delete profile "${editingProfile.name}"?`)) {
+                        onDeleteProfile(editingProfile.id);
+                        setEditingProfile(null);
+                      }
+                    }}
+                    className="px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold flex items-center gap-1 transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete Profile
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProfile(null);
+                      setIsCreating(false);
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm"
+                  >
+                    Save Profile
+                  </button>
+                </div>
               </div>
-            </div>
+            </form>
           )}
         </div>
 
-        {/* Footer info */}
-        <div className="p-4 bg-stone-50/50 dark:bg-stone-900/40 border-t border-stone-100 dark:border-stone-800 text-xs text-stone-500 dark:text-stone-400 flex items-center justify-between">
-          <span>Connected Google Account: {profiles.length} family profiles configured</span>
+        {/* Footer */}
+        <div className="px-5 sm:px-6 py-4 bg-stone-100 dark:bg-[#231f1c] border-t border-stone-200 dark:border-stone-700 flex justify-end">
           <button
-            onClick={() => { resetForm(); onClose(); }}
-            className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
+            onClick={onClose}
+            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition"
           >
             Done
           </button>

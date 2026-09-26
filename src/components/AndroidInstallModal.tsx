@@ -70,8 +70,8 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
         {/* Header */}
         <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between bg-stone-100 dark:bg-[#231f1c]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-black border border-stone-700 overflow-hidden shadow-sm shrink-0 flex items-center justify-center">
-              <img src="/icon.svg" alt="App Icon" className="w-full h-full object-cover" />
+            <div className="w-10 h-10 rounded-2xl bg-black border border-stone-700 overflow-hidden shadow-sm shrink-0 flex items-center justify-center ring-1 ring-emerald-500/30">
+              <img src="/app-logo.png" alt="SuppleTrack Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-bold font-syne text-stone-900 dark:text-white flex items-center gap-2">

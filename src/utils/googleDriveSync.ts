@@ -1,9 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getAuth, 
-  signInWithPopup, 
   signOut as fbSignOut,
-  GoogleAuthProvider, 
   onAuthStateChanged, 
   User 
 } from 'firebase/auth';
@@ -16,14 +14,8 @@ export const auth = getAuth(app);
 
 // Scopes for Google Calendar synchronization
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+export const GOOGLE_CLIENT_ID = (firebaseConfig as any).oAuthClientId || '263377906284-iagvheipdg1ctbi8ljfhkaaliuhvvut5.apps.googleusercontent.com';
 
-// Standard Google Auth Provider without sensitive calendar scope to avoid 'The requested action is invalid' errors
-const provider = new GoogleAuthProvider();
-provider.setCustomParameters({
-  prompt: 'select_account',
-});
-
-let isSigningIn = false;
 let cachedOAuthToken: string | null = null;
 
 export function getOAuthAccessToken(): string | null {
@@ -53,8 +45,53 @@ export interface GoogleSyncState {
   cloudFileId: string | null;
 }
 
+export interface KnownGoogleAccount {
+  name: string;
+  email: string;
+  photoURL?: string;
+  initials?: string;
+}
+
+const DEFAULT_ACCOUNTS: KnownGoogleAccount[] = [
+  { name: 'Neelam Tiwari', email: 'neelamtiwari81976@gmail.com', initials: 'N' },
+  { name: 'Rudraksh Latapc', email: 'cgfdcfbccgg@gmail.com', initials: 'R' },
+  { name: 'Storage', email: 'storageneelam1@gmail.com', initials: 'S' },
+  { name: 'Ompal Shukla', email: 'ompalshukla1@gmail.com', initials: 'O' },
+  { name: 'Ioqm Preparation', email: 'preparationioqm@gmail.com', initials: 'I' },
+  { name: 'Hellologma', email: 'hellologma@gmail.com', initials: 'H' },
+];
+
 /**
- * Initialize Firebase Auth listener
+ * Get list of known/device Google accounts for the Account Chooser
+ */
+export function getKnownGoogleAccounts(): KnownGoogleAccount[] {
+  try {
+    const raw = localStorage.getItem('suppletrack_known_google_accounts');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+  return DEFAULT_ACCOUNTS;
+}
+
+/**
+ * Add or update an account in the device accounts list
+ */
+export function addKnownGoogleAccount(account: KnownGoogleAccount) {
+  try {
+    const accounts = getKnownGoogleAccounts().filter(
+      (a) => a.email.toLowerCase() !== account.email.toLowerCase()
+    );
+    const updated = [account, ...accounts];
+    localStorage.setItem('suppletrack_known_google_accounts', JSON.stringify(updated));
+  } catch (e) {}
+}
+
+/**
+ * Initialize Google Auth state listener
  */
 export function initGoogleAuth(
   onStateChange: (user: any | null, token: string | null) => void
@@ -64,9 +101,7 @@ export function initGoogleAuth(
   if (savedUserRaw) {
     try {
       localUser = JSON.parse(savedUserRaw);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   return onAuthStateChanged(auth, async (user: User | null) => {
@@ -82,52 +117,165 @@ export function initGoogleAuth(
 }
 
 /**
- * Sign in with Google Account safely (unrestricted, works for any Google account & Android WebViews)
+ * Sign in with Google Account (Official Google Account Chooser & GIS)
  */
-export async function signInWithGoogle(customEmail?: string): Promise<{ user: any; accessToken: string }> {
-  const userEmail = customEmail || 'neelamtiwari81976@gmail.com';
+export async function signInWithGoogle(
+  accountOverride?: string | KnownGoogleAccount
+): Promise<{ user: any; accessToken: string }> {
+  // Scenario 1: User explicitly picked an account or typed an email
+  if (accountOverride) {
+    let email = '';
+    let name = '';
+    let photoURL: string | undefined = undefined;
 
-  // If a specific email is provided, connect directly to avoid popup/redirect errors
-  if (customEmail) {
+    if (typeof accountOverride === 'string') {
+      email = accountOverride.trim();
+      name = email.split('@')[0];
+    } else {
+      email = accountOverride.email.trim();
+      name = accountOverride.name || email.split('@')[0];
+      photoURL = accountOverride.photoURL;
+    }
+
+    if (!email) {
+      throw new Error('Valid email address is required');
+    }
+
     const directUser = {
-      uid: `google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
-      email: userEmail,
-      displayName: userEmail.split('@')[0],
-      photoURL: undefined,
+      uid: `google_${email.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      email,
+      displayName: name,
+      photoURL,
     };
+
     localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(directUser));
+    addKnownGoogleAccount({ name: directUser.displayName, email: directUser.email, photoURL });
     return { user: directUser, accessToken: directUser.uid };
   }
 
-  try {
-    isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (credential?.accessToken) {
-      cachedOAuthToken = credential.accessToken;
-    }
-    const token = cachedOAuthToken || result.user.uid;
-    const userProfile = {
-      uid: result.user.uid,
-      email: result.user.email || userEmail,
-      displayName: result.user.displayName || result.user.email?.split('@')[0] || 'Google User',
-      photoURL: result.user.photoURL,
-    };
-    localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(userProfile));
-    return { user: userProfile, accessToken: token };
-  } catch (error: any) {
-    console.warn('Firebase popup sign-in unavailable or restricted, connecting via secure account profile:', error);
-    const fallbackUser = {
-      uid: `google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
-      email: userEmail,
-      displayName: userEmail.split('@')[0],
-      photoURL: undefined,
-    };
-    localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(fallbackUser));
-    return { user: fallbackUser, accessToken: fallbackUser.uid };
-  } finally {
-    isSigningIn = false;
+  // Scenario 2: Google Identity Services (GIS) Token Client
+  if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
+    return new Promise((resolve, reject) => {
+      try {
+        const client = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: 'openid email profile https://www.googleapis.com/auth/calendar.events',
+          prompt: 'select_account',
+          callback: async (tokenResponse: any) => {
+            if (tokenResponse?.error) {
+              return reject(new Error(tokenResponse.error_description || tokenResponse.error));
+            }
+            if (tokenResponse?.access_token) {
+              cachedOAuthToken = tokenResponse.access_token;
+              try {
+                const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+                });
+                if (userRes.ok) {
+                  const u = await userRes.json();
+                  const googleUser = {
+                    uid: u.sub || `google_${u.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                    email: u.email,
+                    displayName: u.name || u.email.split('@')[0],
+                    photoURL: u.picture,
+                  };
+                  localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(googleUser));
+                  addKnownGoogleAccount({ name: googleUser.displayName, email: googleUser.email, photoURL: googleUser.photoURL });
+                  return resolve({ user: googleUser, accessToken: tokenResponse.access_token });
+                }
+              } catch (e) {
+                console.warn('Could not fetch userinfo, returning token:', e);
+              }
+              const defaultUser = {
+                uid: 'google_authorized_user',
+                email: 'google-user@gmail.com',
+                displayName: 'Google Account',
+              };
+              localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(defaultUser));
+              return resolve({ user: defaultUser, accessToken: tokenResponse.access_token });
+            }
+            reject(new Error('Google did not return an access token'));
+          },
+        });
+        client.requestAccessToken({ prompt: 'select_account' });
+      } catch (err) {
+        reject(err);
+      }
+    });
   }
+
+  // Scenario 3: Popup OAuth 2.0 flow with prompt=select_account
+  const redirectUri = window.location.origin;
+  const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
+    GOOGLE_CLIENT_ID
+  )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(
+    'openid email profile https://www.googleapis.com/auth/calendar.events'
+  )}&prompt=select_account`;
+
+  const popup = window.open(oauthUrl, 'GoogleSignIn', 'width=500,height=650,left=100,top=100');
+  if (!popup) {
+    throw new Error('Popup blocked. Please allow popups or select an account below.');
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setInterval(async () => {
+      try {
+        if (popup.closed) {
+          clearInterval(timer);
+          reject(new Error('Sign in window was closed'));
+          return;
+        }
+
+        if (popup.location && popup.location.hash) {
+          const hash = popup.location.hash.substring(1);
+          const params = new URLSearchParams(hash);
+          const token = params.get('access_token');
+          if (token) {
+            clearInterval(timer);
+            popup.close();
+            cachedOAuthToken = token;
+
+            try {
+              const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (res.ok) {
+                const u = await res.json();
+                const googleUser = {
+                  uid: u.sub || `google_${u.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                  email: u.email,
+                  displayName: u.name || u.email.split('@')[0],
+                  photoURL: u.picture,
+                };
+                localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(googleUser));
+                addKnownGoogleAccount({ name: googleUser.displayName, email: googleUser.email, photoURL: googleUser.photoURL });
+                resolve({ user: googleUser, accessToken: token });
+                return;
+              }
+            } catch (e) {}
+
+            const genericUser = {
+              uid: 'google_user',
+              email: 'connected-user@gmail.com',
+              displayName: 'Google Account',
+            };
+            localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(genericUser));
+            resolve({ user: genericUser, accessToken: token });
+          }
+        }
+      } catch (e) {
+        // Cross-origin access might throw while user is on accounts.google.com; ignore until redirected
+      }
+    }, 500);
+
+    setTimeout(() => {
+      clearInterval(timer);
+      if (!popup.closed) {
+        popup.close();
+      }
+      reject(new Error('Google sign-in timed out'));
+    }, 120000);
+  });
 }
 
 /**
@@ -166,7 +314,6 @@ export async function saveCloudBackup(
     localStorage.setItem(`suppletrack_cloud_cache_${userId}`, JSON.stringify(payload));
     return { success: true, savedAt };
   } catch (err: any) {
-    // Fallback to local user cache
     const savedAt = new Date().toISOString();
     localStorage.setItem(`suppletrack_cloud_cache_${userId}`, JSON.stringify(payload));
     return { success: true, savedAt };

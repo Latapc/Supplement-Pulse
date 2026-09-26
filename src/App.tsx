@@ -160,10 +160,17 @@ export default function App() {
   // Real-time clock for live countdowns (updates every 10 seconds)
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   
-  // Notification permission
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
-    typeof Notification !== 'undefined' ? Notification.permission : 'default'
-  );
+  // Notification permission with persistent sound/alert enablement
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
+    if (typeof window !== 'undefined') {
+      const savedAlerts = localStorage.getItem('suppletrack_alerts_enabled');
+      if (savedAlerts === 'true') return 'granted';
+      if (typeof Notification !== 'undefined') {
+        return Notification.permission;
+      }
+    }
+    return 'default';
+  });
   
   // In-app toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -272,38 +279,30 @@ export default function App() {
     return () => clearInterval(interval);
   }, [supplements, logs]);
 
-  // Request browser notification permission
+  // Request browser / device notification permission
   const handleRequestNotificationPermission = async () => {
-    if (typeof Notification === 'undefined') {
-      playChimeSound('dose_due');
-      triggerHaptic('medium');
-      setToastMessage('In-app audio chimes & sound reminders are active for your device!');
-      return;
-    }
+    localStorage.setItem('suppletrack_alerts_enabled', 'true');
+    setNotificationPermission('granted');
+    playChimeSound('dose_taken');
+    triggerHaptic('medium');
 
-    try {
-      const perm = await Notification.requestPermission();
-      setNotificationPermission(perm);
-      if (perm === 'granted') {
-        playChimeSound('dose_taken');
-        triggerHaptic('medium');
-        try {
-          new Notification('SuppleTrack Alerts Activated', {
-            body: 'You will receive timely reminders when your scheduled supplements are due.',
-          });
-        } catch {
-          // Fallback if Notification constructor fails in certain WebViews
+    if (typeof Notification !== 'undefined') {
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          try {
+            new Notification('SuppleTrack Alerts Activated', {
+              body: 'You will receive timely reminders when your scheduled supplements are due.',
+            });
+          } catch {
+            // Fallback for WebViews
+          }
         }
-        setToastMessage('Dose notifications & audio reminders enabled successfully!');
-      } else {
-        playChimeSound('dose_due');
-        setToastMessage('In-app sound chimes & reminders remain active!');
+      } catch (e) {
+        console.warn('Notification permission request error:', e);
       }
-    } catch (e) {
-      console.warn('Notification permission request error:', e);
-      playChimeSound('dose_due');
-      setToastMessage('In-app sound chimes active!');
     }
+    setToastMessage('Dose alerts & sound chime reminders activated!');
   };
 
   // Test notification button

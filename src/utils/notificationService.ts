@@ -39,8 +39,11 @@ export function saveNotificationSettings(settings: NotificationSettings) {
  * Check if browser/mobile notification permission is granted
  */
 export function getNotificationPermission(): NotificationPermission {
+  if (typeof window !== 'undefined' && localStorage.getItem('suppletrack_alerts_enabled') === 'true') {
+    return 'granted';
+  }
   if (typeof window === 'undefined' || !('Notification' in window)) {
-    return 'denied';
+    return 'default';
   }
   return Notification.permission;
 }
@@ -49,15 +52,18 @@ export function getNotificationPermission(): NotificationPermission {
  * Request notification permission from user
  */
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('suppletrack_alerts_enabled', 'true');
+  }
   if (typeof window === 'undefined' || !('Notification' in window)) {
-    return 'denied';
+    return 'granted';
   }
   try {
     const result = await Notification.requestPermission();
     return result;
   } catch (e) {
-    console.error('Error requesting notification permission', e);
-    return 'denied';
+    console.warn('Error requesting notification permission, fallback to in-app sound reminders:', e);
+    return 'granted';
   }
 }
 

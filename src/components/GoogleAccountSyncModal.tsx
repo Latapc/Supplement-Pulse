@@ -171,15 +171,15 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
                 </div>
               </div>
 
-              {/* Official Google Sign-In styled button */}
+              {/* One-Tap Google Connect Option */}
               <div className="pt-2 flex flex-col items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={() => handleSignInClick()}
+                  onClick={() => handleSignInClick('neelamtiwari81976@gmail.com')}
                   disabled={isSyncing}
-                  className="flex items-center gap-3 px-5 py-2.5 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 active:bg-stone-100 shadow-xs transition-all text-sm font-medium text-stone-700 disabled:opacity-50 cursor-pointer w-full justify-center max-w-xs"
+                  className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 active:bg-emerald-200 shadow-xs transition-all text-xs font-bold text-emerald-950 dark:text-emerald-100 disabled:opacity-50 cursor-pointer w-full justify-center max-w-xs"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
                       d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"
@@ -197,23 +197,33 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
                       d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z"
                     />
                   </svg>
-                  <span>Sign in with Google</span>
+                  <span>Connect neelamtiwari81976@gmail.com</span>
                 </button>
 
-                <div className="flex items-center gap-2 w-full max-w-xs my-1">
-                  <div className="h-px bg-stone-200 flex-1"></div>
-                  <span className="text-[10px] text-stone-600 font-medium uppercase">or mobile APK connect</span>
-                  <div className="h-px bg-stone-200 flex-1"></div>
+                <div className="flex items-center gap-2 w-full max-w-xs my-0.5">
+                  <div className="h-px bg-stone-200 dark:bg-stone-700 flex-1"></div>
+                  <span className="text-[10px] text-stone-500 font-medium uppercase">or switch account</span>
+                  <div className="h-px bg-stone-200 dark:bg-stone-700 flex-1"></div>
                 </div>
 
                 {!showManualEmail ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowManualEmail(true)}
-                    className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold underline underline-offset-2 transition"
-                  >
-                    Connect with Google Email directly (No popup needed)
-                  </button>
+                  <div className="flex items-center gap-2 w-full max-w-xs justify-center">
+                    <button
+                      type="button"
+                      onClick={() => handleSignInClick()}
+                      disabled={isSyncing}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-50 shadow-2xs text-xs font-medium text-stone-700 dark:text-stone-200 cursor-pointer"
+                    >
+                      <span>Popup Sign In</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowManualEmail(true)}
+                      className="px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-stone-50 cursor-pointer"
+                    >
+                      Enter other Gmail
+                    </button>
+                  </div>
                 ) : (
                   <div className="w-full max-w-xs space-y-2 pt-1 animate-fadeIn">
                     <input
@@ -221,7 +231,7 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
                       placeholder="e.g. yourname@gmail.com"
                       value={customEmail}
                       onChange={(e) => setCustomEmail(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-hidden focus:border-emerald-600 bg-white"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 dark:border-stone-700 focus:outline-hidden focus:border-emerald-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-white"
                     />
                     <button
                       type="button"

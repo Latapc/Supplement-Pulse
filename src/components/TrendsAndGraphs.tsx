@@ -486,13 +486,16 @@ export const TrendsAndGraphs: React.FC<TrendsAndGraphsProps> = ({
             <span>Cumulative Volume</span>
             <Award className="w-4 h-4 text-stone-700" />
           </div>
-          <div className="text-lg sm:text-2xl font-extrabold text-stone-900 font-display tabular-nums break-words leading-tight">
+          <div 
+            title={`${metrics.totalDosageQuantity.toLocaleString()} ${selectedSupplement?.unit || 'units'}`}
+            className="text-base sm:text-xl font-extrabold text-stone-900 dark:text-white font-display tabular-nums break-words leading-tight"
+          >
             {metrics.totalDosageQuantity >= 1000000
               ? `${(metrics.totalDosageQuantity / 1000000).toLocaleString(undefined, { maximumFractionDigits: 1 })}M`
               : metrics.totalDosageQuantity >= 10000
               ? `${(metrics.totalDosageQuantity / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k`
               : metrics.totalDosageQuantity.toLocaleString()}{' '}
-            <span className="text-xs font-semibold text-stone-500">
+            <span className="text-xs font-semibold text-stone-500 dark:text-stone-400">
               {selectedSupplement?.unit || 'units'}
             </span>
           </div>

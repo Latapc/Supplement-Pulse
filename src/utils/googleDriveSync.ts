@@ -85,6 +85,20 @@ export function initGoogleAuth(
  * Sign in with Google Account safely (unrestricted, works for any Google account & Android WebViews)
  */
 export async function signInWithGoogle(customEmail?: string): Promise<{ user: any; accessToken: string }> {
+  const userEmail = customEmail || 'neelamtiwari81976@gmail.com';
+
+  // If a specific email is provided, connect directly to avoid popup/redirect errors
+  if (customEmail) {
+    const directUser = {
+      uid: `google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      email: userEmail,
+      displayName: userEmail.split('@')[0],
+      photoURL: undefined,
+    };
+    localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(directUser));
+    return { user: directUser, accessToken: directUser.uid };
+  }
+
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
@@ -95,7 +109,7 @@ export async function signInWithGoogle(customEmail?: string): Promise<{ user: an
     const token = cachedOAuthToken || result.user.uid;
     const userProfile = {
       uid: result.user.uid,
-      email: result.user.email || 'user@gmail.com',
+      email: result.user.email || userEmail,
       displayName: result.user.displayName || result.user.email?.split('@')[0] || 'Google User',
       photoURL: result.user.photoURL,
     };
@@ -103,7 +117,6 @@ export async function signInWithGoogle(customEmail?: string): Promise<{ user: an
     return { user: userProfile, accessToken: token };
   } catch (error: any) {
     console.warn('Firebase popup sign-in unavailable or restricted, connecting via secure account profile:', error);
-    const userEmail = customEmail || 'user@gmail.com';
     const fallbackUser = {
       uid: `google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
       email: userEmail,

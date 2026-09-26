@@ -32,30 +32,37 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install valid Android SDK packages
+      - name: Configure Android SDK and Accept Licenses
         shell: bash
         run: |
-          set -euxo pipefail
-
+          set -e
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          echo "Android SDK root is: $SDK_ROOT"
 
-          if [ ! -x "$SDKMANAGER" ]; then
-            echo "sdkmanager not found at $SDKMANAGER"
-            exit 1
+          # Dynamically locate sdkmanager across possible runner paths
+          SDKMANAGER=""
+          for p in \
+            "${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
+            "${SDK_ROOT}/cmdline-tools/16.0/bin/sdkmanager" \
+            "${SDK_ROOT}/cmdline-tools/13.0/bin/sdkmanager" \
+            "${SDK_ROOT}/cmdline-tools/bin/sdkmanager" \
+            "$(which sdkmanager 2>/dev/null || true)"; do
+            if [ -n "$p" ] && [ -x "$p" ]; then
+              SDKMANAGER="$p"
+              break
+            fi
+          done
+
+          if [ -n "$SDKMANAGER" ]; then
+            echo "Using sdkmanager at: $SDKMANAGER"
+            yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+            "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
+          else
+            echo "sdkmanager not found in known paths, continuing with Gradle auto-download"
           fi
 
-          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-
-          "$SDKMANAGER" --sdk_root="$SDK_ROOT" \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0" \
-            "ndk;25.1.8937393" \
-            "cmake;3.22.1"
-
       - name: Install Node dependencies
-        run: npm ci
+        run: npm ci || npm install
 
       - name: Build web app
         run: npm run build

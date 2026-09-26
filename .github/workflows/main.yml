@@ -39,12 +39,31 @@ jobs:
           cmake-version: 3.22.1
           accept-android-sdk-licenses: true
 
-      - name: Install Android platform/build-tools
+      - name: Install required Android packages
         shell: bash
         run: |
-          echo "$ANDROID_HOME"
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --update || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME \
+          set -euxo pipefail
+
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT"
+
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          fi
+
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found at expected paths"
+            echo "SDK_ROOT contents:"
+            ls -la "$SDK_ROOT" || true
+            ls -la "$SDK_ROOT/cmdline-tools" || true
+            exit 1
+          fi
+
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --update || true
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" \
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0" \

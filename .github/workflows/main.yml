@@ -32,31 +32,20 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install required Android packages
+      - name: Install valid Android SDK packages
         shell: bash
         run: |
           set -euxo pipefail
 
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
 
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$SDK_ROOT"
-
-          SDKMANAGER=""
-          if [ -x "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-            SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          elif [ -x "$SDK_ROOT/cmdline-tools/bin/sdkmanager" ]; then
-            SDKMANAGER="$SDK_ROOT/cmdline-tools/bin/sdkmanager"
-          fi
-
-          if [ -z "$SDKMANAGER" ]; then
-            echo "sdkmanager not found"
-            ls -la "$SDK_ROOT" || true
-            ls -la "$SDK_ROOT/cmdline-tools" || true
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found at $SDKMANAGER"
             exit 1
           fi
 
-          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses || true
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
 
           "$SDKMANAGER" --sdk_root="$SDK_ROOT" \
             "platform-tools" \
@@ -65,32 +54,25 @@ jobs:
             "ndk;25.1.8937393" \
             "cmake;3.22.1"
 
-      - name: Install Node Dependencies
+      - name: Install Node dependencies
         run: npm ci
 
-      - name: Build Web Application
+      - name: Build web app
         run: npm run build
 
-      - name: Initialize & Sync Capacitor Android Project
-        run: |
-          npx cap add android || true
-          npx cap sync android
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
 
-      - name: Build Debug APK with Gradle
+      - name: Build Debug APK
+        working-directory: android
         run: |
-          cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Locate Generated APK
-        run: |
-          mkdir -p output-apk
-          find android/app/build/outputs/apk/debug -name "*.apk" -exec cp {} output-apk/SuppleTrack-debug.apk \;
-          ls -la output-apk/
-
-      - name: Upload APK Artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: SuppleTrack-Android-APK
-          path: output-apk/*.apk
+          path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
+

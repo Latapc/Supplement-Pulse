@@ -1,0 +1,13 @@
+{
+	"appId": "com.suppletrack.app",
+	"appName": "SuppleTrack",
+	"webDir": "dist",
+	"bundledWebRuntime": false,
+	"server": {
+		"androidScheme": "https",
+		"cleartext": true
+	},
+	"android": {
+		"allowMixedContent": true
+	}
+}

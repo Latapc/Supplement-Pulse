@@ -31,13 +31,6 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          ndk-version: 25.1.8937393
-          cmake-version: 3.22.1
-          accept-android-sdk-licenses: true
 
       - name: Install required Android packages
         shell: bash
@@ -49,31 +42,31 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT"
 
-          SDKMANAGER="$SDK_ROOT/cmdline-tools/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then
+          SDKMANAGER=""
+          if [ -x "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
             SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          elif [ -x "$SDK_ROOT/cmdline-tools/bin/sdkmanager" ]; then
+            SDKMANAGER="$SDK_ROOT/cmdline-tools/bin/sdkmanager"
           fi
 
-          if [ ! -x "$SDKMANAGER" ]; then
-            echo "sdkmanager not found at expected paths"
-            echo "SDK_ROOT contents:"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found"
             ls -la "$SDK_ROOT" || true
             ls -la "$SDK_ROOT/cmdline-tools" || true
             exit 1
           fi
 
-          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --update || true
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses || true
+
           "$SDKMANAGER" --sdk_root="$SDK_ROOT" \
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0" \
-            "extras;google;google_play_services" \
             "ndk;25.1.8937393" \
-            "cmake;3.22.1" \
-            --verbose
+            "cmake;3.22.1"
 
       - name: Install Node Dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Build Web Application
         run: npm run build
@@ -87,10 +80,9 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Locate Generated APK
-        id: find_apk
         run: |
           mkdir -p output-apk
           find android/app/build/outputs/apk/debug -name "*.apk" -exec cp {} output-apk/SuppleTrack-debug.apk \;

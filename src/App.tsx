@@ -1,3 +1,4 @@
+import { getRedirectResult, GoogleAuthProvider, User } from 'firebase/auth';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Header 
@@ -34,8 +35,8 @@ import { ProfileSwitcherModal } from './components/ProfileSwitcherModal';
 import { GoogleCalendarModal } from './components/GoogleCalendarModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { AndroidInstallModal } from './components/AndroidInstallModal';
-import { User } from 'firebase/auth';
 import { 
+  auth,
   initGoogleAuth, 
   signInWithGoogle, 
   signOutFromGoogle, 
@@ -208,6 +209,31 @@ export default function App() {
     const loadedLogs = loadDoseLogs();
     setSupplements(loadedSupps);
     setLogs(loadedLogs);
+  }, []);
+
+  // Resolve Firebase OAuth redirect after Google sign-in in a TWA/WebView.
+  useEffect(() => {
+    let isMounted = true;
+    const resolveRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (!result || !isMounted) return;
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential?.accessToken) {
+          setGoogleUser(result.user);
+          setHasDriveAccess(true);
+          setToastMessage('Google Drive sign-in complete.');
+          setTimeout(() => setToastMessage(null), 3000);
+        }
+      } catch (error) {
+        console.error('Failed to complete Google redirect sign-in:', error);
+      }
+    };
+
+    void resolveRedirect();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Clock ticker for live countdowns
@@ -890,7 +916,7 @@ export default function App() {
         
         {/* Toast Notification Alert */}
         {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-stone-800 animate-in fade-in slide-in-from-bottom-2">
+          <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-stone-800 animate-in fade-in">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>{toastMessage}</span>
           </div>
@@ -990,7 +1016,7 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleOpenSpecialChat()}
-                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-bold text-amber-950 dark:text-amber-100 bg-amber-300 dark:bg-amber-900/90 hover:bg-amber-400 dark:hover:bg-amber-800 border border-amber-400/90 dark:border-amber-700 rounded-xl transition shadow-xs active:scale-[0.98]"
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-bold text-amber-950 dark:text-amber-100 bg-amber-300 dark:bg-amber-900/90 hover:bg-amber-400 dark:hover:bg-amber-800/90 rounded-xl transition"
                   title="Special Protocols: Cyclic intake (e.g. Boron 2w on / 1w off), custom intervals, infinity"
                 >
                   <Sparkles className="w-4 h-4 text-amber-900 dark:text-amber-300" />
@@ -1002,7 +1028,7 @@ export default function App() {
                     setEditingSupplement(null);
                     setIsAddModalOpen(true);
                   }}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-stone-900 dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-white rounded-xl transition shadow-xs w-fit"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-stone-900 dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-stone-200 rounded-xl transition"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Supplement</span>

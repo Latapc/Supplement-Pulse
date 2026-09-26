@@ -275,7 +275,9 @@ export default function App() {
   // Request browser notification permission
   const handleRequestNotificationPermission = async () => {
     if (typeof Notification === 'undefined') {
-      alert('Your browser does not support web notifications.');
+      playChimeSound('dose_due');
+      triggerHaptic('medium');
+      setToastMessage('In-app audio chimes & sound reminders are active for your device!');
       return;
     }
 
@@ -284,13 +286,23 @@ export default function App() {
       setNotificationPermission(perm);
       if (perm === 'granted') {
         playChimeSound('dose_taken');
-        new Notification('SuppleTrack Alerts Activated', {
-          body: 'You will receive timely reminders when your scheduled supplements are due.',
-        });
-        setToastMessage('Notifications enabled successfully!');
+        triggerHaptic('medium');
+        try {
+          new Notification('SuppleTrack Alerts Activated', {
+            body: 'You will receive timely reminders when your scheduled supplements are due.',
+          });
+        } catch {
+          // Fallback if Notification constructor fails in certain WebViews
+        }
+        setToastMessage('Dose notifications & audio reminders enabled successfully!');
+      } else {
+        playChimeSound('dose_due');
+        setToastMessage('In-app sound chimes & reminders remain active!');
       }
     } catch (e) {
-      console.error(e);
+      console.warn('Notification permission request error:', e);
+      playChimeSound('dose_due');
+      setToastMessage('In-app sound chimes active!');
     }
   };
 
@@ -352,14 +364,14 @@ export default function App() {
   }, []);
 
   // Google Sign-In Action
-  const handleSignInWithGoogle = async () => {
+  const handleSignInWithGoogle = async (customEmail?: string) => {
     setIsSyncing(true);
     try {
-      const { user, accessToken } = await signInWithGoogle();
+      const { user, accessToken } = await signInWithGoogle(customEmail);
       setGoogleUser(user);
       setHasDriveAccess(true);
 
-      // Look for existing file in Google Drive
+      // Look for existing file in Google Cloud Store
       const existing = await findDriveBackupFile(accessToken);
       if (existing) {
         setCloudFileId(existing.id);

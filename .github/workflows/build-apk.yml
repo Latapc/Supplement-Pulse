@@ -1,19 +1,17 @@
-name: Build Android APK
+name: Build Android APK on Every Update
 
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
-  build-android:
-    name: Build Android Debug APK
+  build-apk:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -31,33 +29,29 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Node Dependencies
+      - name: Install Dependencies
         run: npm ci || npm install
 
       - name: Build Web Application
         run: npm run build
 
-      - name: Initialize & Sync Capacitor Android Project
+      - name: Build Android with Capacitor
         run: |
           npx cap add android || true
           npx cap sync android
-
-      - name: Build Debug APK with Gradle
-        run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Locate Generated APK
-        id: find_apk
+      - name: Find and Stage APK
         run: |
-          mkdir -p output-apk
-          find android/app/build/outputs/apk/debug -name "*.apk" -exec cp {} output-apk/SuppleTrack-debug.apk \;
-          ls -la output-apk/
+          mkdir -p build-output
+          find android/app/build/outputs/apk -name "*.apk" -exec cp {} build-output/SuppleTrack-Release-debug.apk \;
+          ls -la build-output/
 
-      - name: Upload APK Artifact
+      - name: Upload APK as GitHub Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SuppleTrack-Android-APK
-          path: output-apk/*.apk
+          path: build-output/*.apk
           retention-days: 30

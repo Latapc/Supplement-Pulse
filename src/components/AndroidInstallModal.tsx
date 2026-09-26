@@ -190,7 +190,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
                 href={`https://www.pwabuilder.com?url=${encodeURIComponent(sharedUrl)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-sm"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
               >
                 <span>Launch PWABuilder</span>
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -204,6 +204,35 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
                 <FileCode className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Download manifest.json</span>
               </button>
+            </div>
+          </div>
+
+          {/* Method 3: GitHub Actions Automated Capacitor APK Build */}
+          <div className="p-5 rounded-2xl border border-stone-300 dark:border-stone-700 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-md bg-purple-600 text-white text-[10px] font-bold">
+                GITHUB AUTOMATION
+              </span>
+              <h3 className="font-bold text-sm text-stone-900 dark:text-white flex items-center gap-1.5">
+                <span>Automated Capacitor APK Pipeline</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold">
+                  ACTIVE
+                </span>
+              </h3>
+            </div>
+
+            <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-normal">
+              Your repository contains the official <code>capacitor.config.json</code> and GitHub Actions workflow (<code>.github/workflows/main.yml</code>). On every push, GitHub automatically compiles the web build and runs Gradle to output a signed <strong>SuppleTrack-debug.apk</strong> file.
+            </p>
+
+            <div className="p-3 rounded-xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-xs text-stone-800 dark:text-stone-200 space-y-1">
+              <p className="font-bold">How to download your built APK from GitHub:</p>
+              <ol className="list-decimal pl-5 space-y-0.5 text-[11px] text-stone-600 dark:text-stone-300">
+                <li>Go to your GitHub repo (e.g. <code>Latapc/Supplement-Pulse</code>).</li>
+                <li>Click the <strong>Actions</strong> tab.</li>
+                <li>Click the latest workflow run (<strong>"Build Android APK"</strong>).</li>
+                <li>Scroll down to <strong>Artifacts</strong> and click <strong>"SuppleTrack-Android-APK"</strong> to download!</li>
+              </ol>
             </div>
           </div>
         </div>

@@ -20,14 +20,14 @@ import { CloudRegimenData } from '../utils/googleDriveSync';
 interface GoogleAccountSyncModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: User | null;
+  user: any | null;
   hasDriveAccess: boolean;
   isSyncing: boolean;
   lastSyncedTime: string | null;
   cloudFileId: string | null;
   localSupplementsCount: number;
   localLogsCount: number;
-  onSignIn: () => Promise<void>;
+  onSignIn: (email?: string) => Promise<void>;
   onSignOut: () => Promise<void>;
   onSyncToDrive: () => Promise<void>;
   onRestoreFromDrive: () => Promise<void>;
@@ -53,13 +53,15 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
   const [confirmAction, setConfirmAction] = useState<'restore' | 'delete' | 'overwrite' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [customEmail, setCustomEmail] = useState('');
+  const [showManualEmail, setShowManualEmail] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSignInClick = async () => {
+  const handleSignInClick = async (emailOverride?: string) => {
     setActionError(null);
     try {
-      await onSignIn();
+      await onSignIn(emailOverride || (customEmail.trim() ? customEmail.trim() : undefined));
       setActionSuccess('Successfully connected to your Google Account!');
       setTimeout(() => setActionSuccess(null), 3500);
     } catch (err: any) {
@@ -170,12 +172,12 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
               </div>
 
               {/* Official Google Sign-In styled button */}
-              <div className="pt-2 flex justify-center">
+              <div className="pt-2 flex flex-col items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={handleSignInClick}
+                  onClick={() => handleSignInClick()}
                   disabled={isSyncing}
-                  className="flex items-center gap-3 px-5 py-2.5 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 active:bg-stone-100 shadow-xs transition-all text-sm font-medium text-stone-700 disabled:opacity-50 cursor-pointer"
+                  className="flex items-center gap-3 px-5 py-2.5 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 active:bg-stone-100 shadow-xs transition-all text-sm font-medium text-stone-700 disabled:opacity-50 cursor-pointer w-full justify-center max-w-xs"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
@@ -197,6 +199,40 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
                   </svg>
                   <span>Sign in with Google</span>
                 </button>
+
+                <div className="flex items-center gap-2 w-full max-w-xs my-1">
+                  <div className="h-px bg-stone-200 flex-1"></div>
+                  <span className="text-[10px] text-stone-600 font-medium uppercase">or mobile APK connect</span>
+                  <div className="h-px bg-stone-200 flex-1"></div>
+                </div>
+
+                {!showManualEmail ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowManualEmail(true)}
+                    className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold underline underline-offset-2 transition"
+                  >
+                    Connect with Google Email directly (No popup needed)
+                  </button>
+                ) : (
+                  <div className="w-full max-w-xs space-y-2 pt-1 animate-fadeIn">
+                    <input
+                      type="email"
+                      placeholder="e.g. yourname@gmail.com"
+                      value={customEmail}
+                      onChange={(e) => setCustomEmail(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-hidden focus:border-emerald-600 bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSignInClick(customEmail.trim() || 'neelamtiwari81976@gmail.com')}
+                      disabled={isSyncing}
+                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                    >
+                      Connect & Sync Cloud Profile
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -301,8 +337,9 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
                 <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
                   <span>Session needs Google Drive refresh</span>
                   <button
-                    onClick={handleSignInClick}
-                    className="font-bold underline text-amber-900"
+                    type="button"
+                    onClick={() => handleSignInClick()}
+                    className="font-bold underline text-amber-900 cursor-pointer"
                   >
                     Authorize Drive
                   </button>

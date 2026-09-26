@@ -1,30 +1,27 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInWithPopup, 
+import {
+  getAuth,
+  getRedirectResult,
+  signInWithRedirect,
   signOut as fbSignOut,
-  GoogleAuthProvider, 
-  onAuthStateChanged, 
-  User 
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  User,
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Supplement, DoseLog } from '../types/supplement';
 
-// Initialize Firebase App safely
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Scopes for Google Calendar synchronization
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 
 const provider = new GoogleAuthProvider();
 provider.addScope(CALENDAR_SCOPE);
-provider.setCustomParameters({
-  prompt: 'select_account',
-});
+provider.setCustomParameters({ prompt: 'select_account' });
 
-let isSigningIn = false;
 let cachedOAuthToken: string | null = null;
+let redirectResultPromise: Promise<void> | null = null;
 
 export function getOAuthAccessToken(): string | null {
   return cachedOAuthToken;
@@ -54,12 +51,43 @@ export interface GoogleSyncState {
 }
 
 /**
+ * Resolve the OAuth redirect exactly once after the page returns from Google.
+ * This handles the redirect flow on app startup after OAuth completes.
+ */
+function resolveRedirectResult(): Promise<void> {
+  if (!redirectResultPromise) {
+    redirectResultPromise = getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          if (credential?.accessToken) {
+            cachedOAuthToken = credential.accessToken;
+          }
+        }
+      })
+      .catch((error) => {
+        // A normal page load has no redirect result. Surface real OAuth errors.
+        if (error?.code !== 'auth/no-auth-event') {
+          console.error('Google redirect result failed:', error);
+        }
+      });
+  }
+  return redirectResultPromise;
+}
+
+/**
  * Initialize Firebase Auth listener
  */
 export function initGoogleAuth(
   onStateChange: (user: User | null, token: string | null) => void
 ) {
+  // Start processing redirect before subscribing so the first callback has the OAuth token.
+  void resolveRedirectResult();
+
   return onAuthStateChanged(auth, async (user: User | null) => {
+    // Wait for any redirect result to resolve before firing the callback
+    await resolveRedirectResult();
+
     if (!user) {
       cachedOAuthToken = null;
     }
@@ -68,23 +96,17 @@ export function initGoogleAuth(
 }
 
 /**
- * Sign in with Google Account safely (unrestricted, works for any Google account)
+ * Sign in with Google Account using redirect flow.
+ * 
+ * Popups (signInWithPopup) are unreliable/blocked in TWAs, Android WebViews, and installed PWAs.
+ * Using redirect ensures the OAuth flow works across all platforms. The auth state listener
+ * will handle the result when the page loads again after the redirect.
  */
 export async function signInWithGoogle(): Promise<{ user: User; accessToken: string }> {
-  try {
-    isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (credential?.accessToken) {
-      cachedOAuthToken = credential.accessToken;
-    }
-    return { user: result.user, accessToken: cachedOAuthToken || result.user.uid };
-  } catch (error: any) {
-    console.error('Google Sign In failed:', error);
-    throw error;
-  } finally {
-    isSigningIn = false;
-  }
+  await signInWithRedirect(auth, provider);
+  // The browser will navigate away to Google and back. This never resolves in the normal flow.
+  // The result is consumed by the auth state listener after the page reloads.
+  return new Promise(() => undefined);
 }
 
 /**

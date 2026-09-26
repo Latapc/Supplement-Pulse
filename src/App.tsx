@@ -363,10 +363,10 @@ export default function App() {
   }, []);
 
   // Google Sign-In Action
-  const handleSignInWithGoogle = async (accountOrEmail?: any) => {
+  const handleSignInWithGoogle = async (customEmail?: string) => {
     setIsSyncing(true);
     try {
-      const { user, accessToken } = await signInWithGoogle(accountOrEmail);
+      const { user, accessToken } = await signInWithGoogle(customEmail);
       setGoogleUser(user);
       setHasDriveAccess(true);
 

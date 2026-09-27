@@ -211,10 +211,10 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
           <div className="p-5 rounded-2xl border border-stone-300 dark:border-stone-700 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-3">
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded-md bg-purple-600 text-white text-[10px] font-bold">
-                GITHUB AUTOMATION
+                DIRECT APK DOWNLOAD
               </span>
               <h3 className="font-bold text-sm text-stone-900 dark:text-white flex items-center gap-1.5">
-                <span>Automated Capacitor APK Pipeline</span>
+                <span>Standalone SuppleTrack.apk (No Zip)</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold">
                   ACTIVE
                 </span>
@@ -222,17 +222,32 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
             </div>
 
             <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-normal">
-              Your repository contains the official <code>capacitor.config.json</code> and GitHub Actions workflow (<code>.github/workflows/main.yml</code>). On every push, GitHub automatically compiles the web build and runs Gradle to output a signed <strong>SuppleTrack-debug.apk</strong> file.
+              The GitHub Actions workflow compiles the Android project and attaches a standalone <strong>SuppleTrack.apk</strong> directly to your repository's Releases. You get the raw <code>.apk</code> file directly on your phone with no zip archive to extract!
             </p>
 
-            <div className="p-3 rounded-xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-xs text-stone-800 dark:text-stone-200 space-y-1">
-              <p className="font-bold">How to download your built APK from GitHub:</p>
-              <ol className="list-decimal pl-5 space-y-0.5 text-[11px] text-stone-600 dark:text-stone-300">
-                <li>Go to your GitHub repo (e.g. <code>Latapc/Supplement-Pulse</code>).</li>
-                <li>Click the <strong>Actions</strong> tab.</li>
-                <li>Click the latest workflow run (<strong>"Build Android APK"</strong>).</li>
-                <li>Scroll down to <strong>Artifacts</strong> and click <strong>"SuppleTrack-Android-APK"</strong> to download!</li>
-              </ol>
+            {/* Direct Release Link */}
+            <div className="pt-1">
+              <a
+                href="https://github.com/Latapc/Supplement-Pulse/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download SuppleTrack.apk from GitHub Releases (Direct APK)</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            {/* Conflict Fix Callout */}
+            <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 text-xs text-amber-950 dark:text-amber-200 space-y-1.5">
+              <p className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-100">
+                <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>Fix for "Package conflicts with an existing package":</span>
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                If Android shows this error, it means an older build was signed with a temporary key. <strong>Uninstall the old SuppleTrack (and Supplement Pulse) from your home screen once</strong>. Then install the new APK. All future updates will use our permanent signing key and will update smoothly in-place!
+              </p>
             </div>
           </div>
         </div>

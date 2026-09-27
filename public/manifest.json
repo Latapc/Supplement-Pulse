@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "SuppleTrack - Supplement & Vitamin Regimen Tracker",
-  "short_name": "SuppleTrack",
+  "name": "Supple Pulse - Supplement & Vitamin Regimen Tracker",
+  "short_name": "Supple Pulse",
   "description": "Smart supplement regimen tracker with multiple profiles, Google Calendar sync, dosage countdowns, notifications, and adherence analytics.",
   "lang": "en-US",
   "dir": "ltr",

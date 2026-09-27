@@ -81,7 +81,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
                 </span>
               </h2>
               <p className="text-xs text-stone-600 dark:text-stone-300 font-medium">
-                Install SuppleTrack directly on your Android phone or generate a .apk
+                Install Supple Pulse directly on your Android phone or generate a .apk
               </p>
             </div>
           </div>
@@ -110,7 +110,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
             </div>
 
             <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-normal">
-              Android automatically compiles SuppleTrack into a true native <strong>WebAPK</strong> on your phone with your new neon pill icon, splash screen, offline caching, and standalone window without browser address bars!
+              Android automatically compiles Supple Pulse into a true native <strong>WebAPK</strong> on your phone with your new neon pill icon, splash screen, offline caching, and standalone window without browser address bars!
             </p>
 
             {isInstallable ? (
@@ -120,7 +120,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
                 className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md flex items-center justify-center gap-2"
               >
                 <Download className="w-4 h-4 stroke-[2.5]" />
-                <span>Tap Here to Install SuppleTrack on Android</span>
+                <span>Tap Here to Install Supple Pulse on Android</span>
               </button>
             ) : (
               <div className="p-3.5 rounded-xl bg-white dark:bg-[#25211e] border border-stone-300 dark:border-stone-700 space-y-2 text-xs text-stone-800 dark:text-stone-200">
@@ -214,7 +214,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
                 DIRECT APK DOWNLOAD
               </span>
               <h3 className="font-bold text-sm text-stone-900 dark:text-white flex items-center gap-1.5">
-                <span>Standalone SuppleTrack.apk (No Zip)</span>
+                <span>Standalone SupplePulse.apk (No Zip)</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold">
                   ACTIVE
                 </span>
@@ -222,7 +222,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
             </div>
 
             <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-normal">
-              The GitHub Actions workflow compiles the Android project and attaches a standalone <strong>SuppleTrack.apk</strong> directly to your repository's Releases. You get the raw <code>.apk</code> file directly on your phone with no zip archive to extract!
+              The GitHub Actions workflow compiles the Android project and attaches a standalone <strong>SupplePulse.apk</strong> directly to your repository's Releases. You get the raw <code>.apk</code> file directly on your phone with no zip archive to extract!
             </p>
 
             {/* Direct Release Link */}
@@ -234,7 +234,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
                 className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
               >
                 <Download className="w-4 h-4" />
-                <span>Download SuppleTrack.apk from GitHub Releases (Direct APK)</span>
+                <span>Download SupplePulse.apk from GitHub Releases (Direct APK)</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
@@ -246,7 +246,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
                 <span>Fix for "Package conflicts with an existing package":</span>
               </p>
               <p className="text-[11px] leading-relaxed">
-                If Android shows this error, it means an older build was signed with a temporary key. <strong>Uninstall the old SuppleTrack (and Supplement Pulse) from your home screen once</strong>. Then install the new APK. All future updates will use our permanent signing key and will update smoothly in-place!
+                If Android shows this error, it means an older build was signed with a temporary key. <strong>Uninstall the old Supple Pulse from your home screen once</strong>. Then install the new APK. All future updates will use our permanent signing key and will update smoothly in-place!
               </p>
             </div>
           </div>

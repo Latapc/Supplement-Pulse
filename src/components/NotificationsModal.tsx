@@ -149,7 +149,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
             <p className="text-xs text-stone-500 dark:text-stone-400">
               {permission === 'granted'
-                ? 'Your device allows SuppleTrack to pop up dosage alerts even when multitasking.'
+                ? 'Your device allows Supple Pulse to pop up dosage alerts even when multitasking.'
                 : permission === 'denied'
                 ? 'Notifications are blocked in your browser settings. To enable, tap the lock/settings icon in your address bar.'
                 : 'Allow notifications so you never miss a weekly or daily supplement booster.'}

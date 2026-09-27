@@ -73,19 +73,19 @@ jobs:
       - name: Stage Standalone APK (Flat, No Nested Folders)
         run: |
           mkdir -p output-apk
-          # Stage the apk cleanly as a single standalone file SuppleTrack.apk
+          # Stage the apk cleanly as a single standalone file SupplePulse.apk
           if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
-            cp "android/app/build/outputs/apk/debug/app-debug.apk" "output-apk/SuppleTrack.apk"
+            cp "android/app/build/outputs/apk/debug/app-debug.apk" "output-apk/SupplePulse.apk"
           else
-            find android/app/build/outputs/apk -name "*.apk" -exec cp {} "output-apk/SuppleTrack.apk" \;
+            find android/app/build/outputs/apk -name "*.apk" -exec cp {} "output-apk/SupplePulse.apk" \;
           fi
           ls -lh output-apk/
 
       - name: Upload Single APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SuppleTrack-APK
-          path: output-apk/SuppleTrack.apk
+          name: SupplePulse-APK
+          path: output-apk/SupplePulse.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -99,7 +99,7 @@ jobs:
           git tag -f v1.0.0 || true
           git push -f origin v1.0.0 || true
           gh release delete v1.0.0 -y || true
-          gh release create v1.0.0 output-apk/SuppleTrack.apk \
-            --title "SuppleTrack Android APK (Direct .apk)" \
-            --notes "Direct raw Android APK file. No unzipping needed. Tap SuppleTrack.apk below to install directly on your phone." \
+          gh release create v1.0.0 output-apk/SupplePulse.apk \
+            --title "Supple Pulse Android APK (Direct .apk)" \
+            --notes "Direct raw Android APK file. No unzipping needed. Tap SupplePulse.apk below to install directly on your phone." \
             --clobber || true

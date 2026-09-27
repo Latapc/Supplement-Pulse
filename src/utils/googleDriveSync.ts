@@ -64,129 +64,11 @@ export interface GoogleSyncState {
 }
 
 /**
- * Builds standard Google OAuth 2.0 Web URL with prompt=select_account
- * This is the exact endpoint used by modern platforms (like Muscle Nectar)
- */
-export function buildGoogleOAuthUrl(): string {
-  if (typeof window === 'undefined') return '#';
-  const redirectUri = window.location.origin + window.location.pathname;
-  const nonce = Math.random().toString(36).substring(2);
-  const state = Math.random().toString(36).substring(2);
-  return (
-    `https://accounts.google.com/o/oauth2/v2/auth?` +
-    `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&` +
-    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-    `response_type=token%20id_token&` +
-    `scope=${encodeURIComponent(OAUTH_SCOPES)}&` +
-    `prompt=select_account&` +
-    `state=${encodeURIComponent(state)}&` +
-    `nonce=${encodeURIComponent(nonce)}`
-  );
-}
-
-/**
- * Direct navigation to Google OAuth 2.0 account chooser
- */
-export function openGoogleLoginRedirect() {
-  if (typeof window !== 'undefined') {
-    window.location.href = buildGoogleOAuthUrl();
-  }
-}
-
-/**
- * Parses JWT token payload from Google ID Token
- */
-function parseJwt(token: string): any {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Check if the page was loaded with an OAuth redirect hash (#access_token=... or #id_token=...)
- */
-export async function checkOAuthRedirectResult(): Promise<GoogleUserProfile | null> {
-  if (typeof window === 'undefined') return null;
-
-  const hash = window.location.hash;
-  if (!hash || (!hash.includes('access_token=') && !hash.includes('id_token='))) {
-    return null;
-  }
-
-  try {
-    const params = new URLSearchParams(hash.substring(1));
-    const accessToken = params.get('access_token');
-    const idToken = params.get('id_token');
-
-    // Clean up hash from browser URL without page reload
-    if (window.history && window.history.replaceState) {
-      window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
-    }
-
-    if (accessToken) {
-      cachedOAuthToken = accessToken;
-      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        const info = await res.json();
-        const profile: GoogleUserProfile = {
-          uid: info.sub || `google_${info.email?.replace(/[^a-zA-Z0-9]/g, '_')}`,
-          email: info.email,
-          displayName: info.name || info.email?.split('@')[0] || 'Google User',
-          photoURL: info.picture,
-          accessToken,
-        };
-        localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(profile));
-        return profile;
-      }
-    }
-
-    if (idToken) {
-      const payload = parseJwt(idToken);
-      if (payload && payload.email) {
-        const profile: GoogleUserProfile = {
-          uid: payload.sub || `google_${payload.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
-          email: payload.email,
-          displayName: payload.name || payload.email.split('@')[0],
-          photoURL: payload.picture,
-          accessToken: idToken,
-        };
-        localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(profile));
-        return profile;
-      }
-    }
-  } catch (err) {
-    console.warn('Error handling OAuth redirect response:', err);
-  }
-
-  return null;
-}
-
-/**
  * Initialize Google Auth state listener
  */
 export function initGoogleAuth(
   onStateChange: (user: any | null, token: string | null) => void
 ) {
-  // First check if returning from OAuth redirect
-  checkOAuthRedirectResult().then((redirectedUser) => {
-    if (redirectedUser) {
-      onStateChange(redirectedUser, redirectedUser.accessToken || redirectedUser.uid);
-      return;
-    }
-  });
-
   const savedUserRaw = localStorage.getItem('suppletrack_connected_google_user');
   let localUser: GoogleUserProfile | null = null;
   if (savedUserRaw) {
@@ -219,63 +101,47 @@ export function initGoogleAuth(
 
 /**
  * Launch the official Google Account Chooser
- * Bulletproof implementation: On mobile / Android WebViews, immediately redirects to Google's standard OAuth URL.
- * On desktop browsers, attempts GIS with a 2-second timeout before falling back to direct redirect.
- * Never leaves promises hanging or spinners rolling to infinity.
+ * Uses Firebase Authentication signInWithPopup.
+ * Routed through Firebase's authorized domain (gen-lang-client-0994165809.firebaseapp.com)
+ * eliminating Error 400: redirect_uri_mismatch.
  */
 export async function launchGoogleAccountChooser(): Promise<GoogleUserProfile> {
-  const isMobileOrWebView = 
-    typeof window !== 'undefined' && 
-    (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || 
-     !!(window as any).Capacitor?.isNativePlatform() || 
-     navigator.userAgent.includes('wv'));
-
-  // On Android WebView or mobile devices, direct URL navigation is 100% reliable
-  if (isMobileOrWebView) {
-    openGoogleLoginRedirect();
-    return new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Redirecting to Google...')), 800);
-    });
-  }
-
-  // Desktop browser flow with strict 2-second timeout
-  return new Promise((resolve, reject) => {
-    let finished = false;
-    const timeout = setTimeout(() => {
-      if (!finished) {
-        finished = true;
-        openGoogleLoginRedirect();
-        reject(new Error('Redirecting to Google...'));
-      }
-    }, 2000);
-
-    const google = (window as any).google;
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      cachedOAuthToken = credential.accessToken;
+    }
+    const profile: GoogleUserProfile = {
+      uid: result.user.uid,
+      email: result.user.email || '',
+      displayName: result.user.displayName || result.user.email?.split('@')[0] || 'Google User',
+      photoURL: result.user.photoURL || undefined,
+      accessToken: cachedOAuthToken || result.user.uid,
+    };
+    localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(profile));
+    return profile;
+  } catch (err: any) {
+    // If popup was blocked or user closed it, check GIS web client fallback
+    const google = typeof window !== 'undefined' ? (window as any).google : null;
     if (google?.accounts?.oauth2) {
-      try {
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_CLIENT_ID,
-          scope: OAUTH_SCOPES,
-          prompt: 'select_account',
-          callback: async (tokenResponse: any) => {
-            if (finished) return;
-            clearTimeout(timeout);
-            finished = true;
-
-            if (tokenResponse?.error) {
-              return reject(new Error(tokenResponse.error_description || tokenResponse.error));
-            }
-            if (!tokenResponse?.access_token) {
-              return reject(new Error('No access token received from Google.'));
-            }
-
-            try {
+      return new Promise((resolve, reject) => {
+        try {
+          const client = google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: OAUTH_SCOPES,
+            prompt: 'select_account',
+            callback: async (tokenResponse: any) => {
+              if (tokenResponse?.error) {
+                return reject(new Error(tokenResponse.error_description || tokenResponse.error));
+              }
+              if (!tokenResponse?.access_token) {
+                return reject(new Error('No access token received from Google.'));
+              }
               cachedOAuthToken = tokenResponse.access_token;
               const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                 headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
               });
-              if (!userRes.ok) {
-                throw new Error('Failed to retrieve Google user profile.');
-              }
               const info = await userRes.json();
               const profile: GoogleUserProfile = {
                 uid: info.sub || `google_${info.email?.replace(/[^a-zA-Z0-9]/g, '_')}`,
@@ -286,35 +152,25 @@ export async function launchGoogleAccountChooser(): Promise<GoogleUserProfile> {
               };
               localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(profile));
               resolve(profile);
-            } catch (err: any) {
-              reject(err);
-            }
-          },
-        });
-        client.requestAccessToken({ prompt: 'select_account' });
-        return;
-      } catch {
-        clearTimeout(timeout);
-        finished = true;
-        openGoogleLoginRedirect();
-        reject(new Error('Redirecting to Google...'));
-      }
-    } else {
-      clearTimeout(timeout);
-      finished = true;
-      openGoogleLoginRedirect();
-      reject(new Error('Redirecting to Google...'));
+            },
+          });
+          client.requestAccessToken({ prompt: 'select_account' });
+        } catch {
+          reject(err);
+        }
+      });
     }
-  });
+    throw err;
+  }
 }
 
 /**
  * Sign in with Google Account (interactive account picker, works for ANY Google account)
  */
 export async function signInWithGoogle(customEmail?: string): Promise<{ user: GoogleUserProfile; accessToken: string }> {
-  // If user explicitly entered an email in the manual switcher
+  // If user explicitly entered a private email in the manual switcher
   if (customEmail && customEmail.trim()) {
-    const email = customEmail.trim();
+    const email = customEmail.trim().toLowerCase();
     const directUser: GoogleUserProfile = {
       uid: `google_${email.replace(/[^a-zA-Z0-9]/g, '_')}`,
       email,

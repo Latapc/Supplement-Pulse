@@ -32,7 +32,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
             Enable Dose Alerts & Sound Reminders
           </h4>
           <p className="text-xs text-stone-300 mt-0.5 max-w-xl">
-            SuppleTrack can notify you in your browser the moment your scheduled dose arrives, complete with audio chime reminders.
+            Supple Pulse can notify you in your browser the moment your scheduled dose arrives, complete with audio chime reminders.
           </p>
         </div>
       </div>

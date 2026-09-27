@@ -259,7 +259,7 @@ export default function App() {
 
           // Trigger native notification
           try {
-            const notif = new Notification('SuppleTrack: Dose Due Now', {
+            const notif = new Notification('Supple Pulse: Dose Due Now', {
               body: `Time to take your scheduled ${supp.doseAmount.toLocaleString()} ${supp.unit} of ${supp.name}!`,
               icon: '/app-logo.png',
             });
@@ -292,7 +292,7 @@ export default function App() {
         const perm = await Notification.requestPermission();
         if (perm === 'granted') {
           try {
-            new Notification('SuppleTrack Alerts Activated', {
+            new Notification('Supple Pulse Alerts Activated', {
               body: 'You will receive timely reminders when your scheduled supplements are due.',
             });
           } catch {
@@ -310,7 +310,7 @@ export default function App() {
   const handleSendTestNotification = () => {
     playChimeSound('dose_due');
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification('SuppleTrack Test Reminder', {
+      new Notification('Supple Pulse Test Reminder', {
         body: 'This is how your supplement dose reminder will appear when scheduled!',
       });
     }
@@ -398,7 +398,7 @@ export default function App() {
       // If no file exists in Drive yet, create initial backup with current local data
       const payload: CloudRegimenData = {
         version: 1,
-        appName: 'SuppleTrack',
+        appName: 'Supple Pulse',
         updatedAt: new Date().toISOString(),
         userEmail: user.email || undefined,
         supplements,
@@ -441,7 +441,7 @@ export default function App() {
     try {
       const payload: CloudRegimenData = {
         version: 1,
-        appName: 'SuppleTrack',
+        appName: 'Supple Pulse',
         updatedAt: new Date().toISOString(),
         userEmail: googleUser?.email || undefined,
         supplements,
@@ -476,7 +476,7 @@ export default function App() {
       if (!fileId) {
         const found = await findDriveBackupFile(token);
         if (!found) {
-          throw new Error('No SuppleTrack backup file found in your Google Drive.');
+          throw new Error('No Supple Pulse backup file found in your Google Drive.');
         }
         fileId = found.id;
         setCloudFileId(found.id);
@@ -543,7 +543,7 @@ export default function App() {
       try {
         const payload: CloudRegimenData = {
           version: 1,
-          appName: 'SuppleTrack',
+          appName: 'Supple Pulse',
           updatedAt: new Date().toISOString(),
           userEmail: googleUser.email || undefined,
           supplements,
@@ -1106,7 +1106,7 @@ export default function App() {
       <footer className="border-t border-stone-200 bg-white/50 py-6 text-stone-500 text-xs mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-stone-800 font-display">SuppleTrack</span>
+            <span className="font-bold text-stone-800 font-display">Supple Pulse</span>
             <span aria-hidden="true">·</span>
             <span>Intelligent Supplement & Vitamin Intake Protocol</span>
           </div>

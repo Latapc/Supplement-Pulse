@@ -62,11 +62,13 @@ export const Header: React.FC<HeaderProps> = ({
         
         {/* Zone 1: Brand & Profile Switcher (Google TV Style) */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0">
-            <img src="/logo-glow.svg" alt="SuppleTrack Icon" className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(0,252,168,0.5)]" />
-          </div>
+          <img 
+            src="/app-logo.png" 
+            alt="Supple Pulse Icon" 
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shrink-0" 
+          />
           <span className="hidden sm:inline text-lg font-bold tracking-tight text-stone-900 dark:text-stone-100 font-display shrink-0">
-            SuppleTrack
+            Supple Pulse
           </span>
 
           {/* Profile Switcher Pill - Google TV style */}

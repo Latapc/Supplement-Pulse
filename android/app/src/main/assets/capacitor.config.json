@@ -1,6 +1,6 @@
 {
 	"appId": "com.suppletrack.app",
-	"appName": "SuppleTrack",
+	"appName": "Supple Pulse",
 	"webDir": "dist",
 	"bundledWebRuntime": false,
 	"server": {

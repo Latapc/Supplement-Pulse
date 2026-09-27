@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Neon Glow Filter -->
+    <filter id="neonGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="blur1"/>
+      <feGaussianBlur stdDeviation="18" result="blur2"/>
+      <feGaussianBlur stdDeviation="30" result="blur3"/>
+      <feMerge>
+        <feMergeNode in="blur3"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Capsule Body with transparent blending -->
+  <rect 
+    x="176" 
+    y="86" 
+    width="160" 
+    height="340" 
+    rx="80" 
+    fill="#00fca8" 
+    fill-opacity="0.1"
+    stroke="#00fca8" 
+    stroke-width="26" 
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#neonGlow)"
+  />
+
+  <!-- Center divider line -->
+  <line 
+    x1="176" 
+    y1="256" 
+    x2="336" 
+    y2="256" 
+    stroke="#00fca8" 
+    stroke-width="26" 
+    stroke-linecap="round"
+    filter="url(#neonGlow)"
+  />
+</svg>

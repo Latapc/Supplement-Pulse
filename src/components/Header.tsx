@@ -7,7 +7,6 @@ import {
   Sun, 
   Moon, 
   ChevronDown, 
-  Smartphone, 
   Heart, 
   Sparkles, 
   User, 
@@ -16,7 +15,6 @@ import {
 } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile, ProfileType } from '../types/profile';
-import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   activeTab: 'today' | 'supplements' | 'trends' | 'history';
@@ -64,8 +62,8 @@ export const Header: React.FC<HeaderProps> = ({
         
         {/* Zone 1: Brand & Profile Switcher (Google TV Style) */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-black text-white flex items-center justify-center shadow-md border border-stone-800 shrink-0 overflow-hidden">
-            <img src="/app-logo.png" alt="SuppleTrack Icon" className="w-full h-full object-cover" />
+          <div className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0">
+            <img src="/logo-glow.svg" alt="SuppleTrack Icon" className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(0,252,168,0.5)]" />
           </div>
           <span className="hidden sm:inline text-lg font-bold tracking-tight text-stone-900 dark:text-stone-100 font-display shrink-0">
             SuppleTrack
@@ -157,18 +155,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 3: Actions & Integrations */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* PWA / Android APK button */}
-          <PWAInstallButton onOpenAndroidModal={onOpenAndroidInstall} />
-
-          {/* Android APK Hub trigger */}
-          <button
-            onClick={onOpenAndroidInstall}
-            title="Android APK & Mobile App Installation Guide"
-            className="p-2 text-stone-600 dark:text-stone-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors shrink-0"
-          >
-            <Smartphone className="w-4 h-4" />
-          </button>
-
           {/* Google Calendar Sync Button */}
           <button
             onClick={onOpenCalendarSync}

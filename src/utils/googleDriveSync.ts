@@ -18,7 +18,7 @@ export const GOOGLE_CLIENT_ID = firebaseConfig.oAuthClientId || '263377906284-ia
 
 // Scopes for Google services
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
-const OAUTH_SCOPES = ['openid', 'email', 'profile', CALENDAR_SCOPE].join(' ');
+export const OAUTH_SCOPES = ['openid', 'email', 'profile', CALENDAR_SCOPE].join(' ');
 
 // Google Auth Provider
 const provider = new GoogleAuthProvider();
@@ -27,7 +27,6 @@ provider.setCustomParameters({
 });
 
 let cachedOAuthToken: string | null = null;
-let tokenClientInstance: any = null;
 
 export function getOAuthAccessToken(): string | null {
   return cachedOAuthToken;
@@ -62,6 +61,36 @@ export interface GoogleSyncState {
   lastSyncedTime: string | null;
   lastError: string | null;
   cloudFileId: string | null;
+}
+
+/**
+ * Builds standard Google OAuth 2.0 Web URL with prompt=select_account
+ * This is the exact endpoint used by modern platforms (like Muscle Nectar)
+ */
+export function buildGoogleOAuthUrl(): string {
+  if (typeof window === 'undefined') return '#';
+  const redirectUri = window.location.origin + window.location.pathname;
+  const nonce = Math.random().toString(36).substring(2);
+  const state = Math.random().toString(36).substring(2);
+  return (
+    `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&` +
+    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+    `response_type=token%20id_token&` +
+    `scope=${encodeURIComponent(OAUTH_SCOPES)}&` +
+    `prompt=select_account&` +
+    `state=${encodeURIComponent(state)}&` +
+    `nonce=${encodeURIComponent(nonce)}`
+  );
+}
+
+/**
+ * Direct navigation to Google OAuth 2.0 account chooser
+ */
+export function openGoogleLoginRedirect() {
+  if (typeof window !== 'undefined') {
+    window.location.href = buildGoogleOAuthUrl();
+  }
 }
 
 /**
@@ -189,14 +218,38 @@ export function initGoogleAuth(
 }
 
 /**
- * Launch the official Google Account Chooser ("Choose an account to continue to SuppleTrack")
- * Uses Google Identity Services Token Client with prompt='select_account', exactly like modern services.
+ * Launch the official Google Account Chooser
+ * Bulletproof implementation: On mobile / Android WebViews, immediately redirects to Google's standard OAuth URL.
+ * On desktop browsers, attempts GIS with a 2-second timeout before falling back to direct redirect.
+ * Never leaves promises hanging or spinners rolling to infinity.
  */
 export async function launchGoogleAccountChooser(): Promise<GoogleUserProfile> {
-  return new Promise((resolve, reject) => {
-    const google = (window as any).google;
+  const isMobileOrWebView = 
+    typeof window !== 'undefined' && 
+    (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || 
+     !!(window as any).Capacitor?.isNativePlatform() || 
+     navigator.userAgent.includes('wv'));
 
-    // Method 1: Google Identity Services (GIS) Token Client
+  // On Android WebView or mobile devices, direct URL navigation is 100% reliable
+  if (isMobileOrWebView) {
+    openGoogleLoginRedirect();
+    return new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Redirecting to Google...')), 800);
+    });
+  }
+
+  // Desktop browser flow with strict 2-second timeout
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const timeout = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        openGoogleLoginRedirect();
+        reject(new Error('Redirecting to Google...'));
+      }
+    }, 2000);
+
+    const google = (window as any).google;
     if (google?.accounts?.oauth2) {
       try {
         const client = google.accounts.oauth2.initTokenClient({
@@ -204,6 +257,10 @@ export async function launchGoogleAccountChooser(): Promise<GoogleUserProfile> {
           scope: OAUTH_SCOPES,
           prompt: 'select_account',
           callback: async (tokenResponse: any) => {
+            if (finished) return;
+            clearTimeout(timeout);
+            finished = true;
+
             if (tokenResponse?.error) {
               return reject(new Error(tokenResponse.error_description || tokenResponse.error));
             }
@@ -234,47 +291,20 @@ export async function launchGoogleAccountChooser(): Promise<GoogleUserProfile> {
             }
           },
         });
-        tokenClientInstance = client;
         client.requestAccessToken({ prompt: 'select_account' });
         return;
-      } catch (gisError) {
-        console.warn('GIS TokenClient initiation error, falling back:', gisError);
+      } catch {
+        clearTimeout(timeout);
+        finished = true;
+        openGoogleLoginRedirect();
+        reject(new Error('Redirecting to Google...'));
       }
+    } else {
+      clearTimeout(timeout);
+      finished = true;
+      openGoogleLoginRedirect();
+      reject(new Error('Redirecting to Google...'));
     }
-
-    // Method 2: Firebase signInWithPopup with select_account prompt
-    signInWithPopup(auth, provider)
-      .then((result) => {
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        if (credential?.accessToken) {
-          cachedOAuthToken = credential.accessToken;
-        }
-        const profile: GoogleUserProfile = {
-          uid: result.user.uid,
-          email: result.user.email || '',
-          displayName: result.user.displayName || result.user.email?.split('@')[0] || 'Google User',
-          photoURL: result.user.photoURL || undefined,
-          accessToken: cachedOAuthToken || result.user.uid,
-        };
-        localStorage.setItem('suppletrack_connected_google_user', JSON.stringify(profile));
-        resolve(profile);
-      })
-      .catch((popupErr) => {
-        console.warn('Firebase popup unavailable, launching direct Google OAuth flow:', popupErr);
-        // Method 3: Direct Google OAuth 2.0 Web flow with account picker (like Muscle Nectar)
-        const redirectUri = window.location.origin + window.location.pathname;
-        const nonce = Math.random().toString(36).substring(2);
-        const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-          `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&` +
-          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-          `response_type=token%20id_token&` +
-          `scope=${encodeURIComponent(OAUTH_SCOPES)}&` +
-          `prompt=select_account&` +
-          `nonce=${encodeURIComponent(nonce)}`;
-
-        // Open in current window or new tab so user sees the native Google "Choose an account" screen
-        window.location.href = oauthUrl;
-      });
   });
 }
 

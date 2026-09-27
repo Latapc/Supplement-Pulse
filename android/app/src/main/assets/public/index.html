@@ -7,6 +7,7 @@
     <meta name="description" content="Smart supplement regimen tracker with multiple profiles, Google Calendar sync, dosage countdowns, notifications, and adherence analytics." />
     <meta property="og:title" content="SuppleTrack - Supplement & Vitamin Regimen Tracker" />
     <meta property="og:description" content="Smart supplement regimen tracker with multiple profiles, Google Calendar sync, dosage countdowns, notifications, and adherence analytics." />
+    <meta property="og:image" content="/app-logo.png" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
 
@@ -19,12 +20,16 @@
     <meta name="apple-mobile-web-app-title" content="SuppleTrack" />
     <meta name="application-name" content="SuppleTrack" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" href="/app-logo.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Google Identity Services for official Google Sign-In Account Chooser -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <script>
       try {
         const saved = localStorage.getItem('suppletrack_theme_mode');
@@ -36,8 +41,8 @@
         }
       } catch (e) {}
     </script>
-    <script type="module" crossorigin src="/assets/index-n6M8GrKr.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BheTkP2O.css">
+    <script type="module" crossorigin src="/assets/index-Bmx3HVb4.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D4sy2rDs.css">
   <link rel="manifest" href="/manifest.json"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
   <body class="bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 antialiased selection:bg-emerald-100 dark:selection:bg-emerald-900 selection:text-emerald-900 dark:selection:text-emerald-200 min-h-screen transition-colors duration-200">
     <div id="root"></div>

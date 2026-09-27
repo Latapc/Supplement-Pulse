@@ -45,7 +45,8 @@ import {
   downloadFromDrive, 
   uploadToDrive, 
   deleteDriveFile,
-  CloudRegimenData
+  CloudRegimenData,
+  GoogleUserProfile
 } from './utils/googleDriveSync';
 
 import { 
@@ -260,7 +261,7 @@ export default function App() {
           try {
             const notif = new Notification('SuppleTrack: Dose Due Now', {
               body: `Time to take your scheduled ${supp.doseAmount.toLocaleString()} ${supp.unit} of ${supp.name}!`,
-              icon: '/vite.svg',
+              icon: '/app-logo.png',
             });
             notif.onclick = () => {
               window.focus();
@@ -333,7 +334,7 @@ export default function App() {
   });
 
   // Google Account Cloud Sync State
-  const [googleUser, setGoogleUser] = useState<User | null>(null);
+  const [googleUser, setGoogleUser] = useState<GoogleUserProfile | User | any | null>(null);
   const [hasDriveAccess, setHasDriveAccess] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);

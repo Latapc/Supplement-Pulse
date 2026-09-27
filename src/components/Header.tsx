@@ -65,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Zone 1: Brand & Profile Switcher (Google TV Style) */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-black text-white flex items-center justify-center shadow-md border border-stone-800 shrink-0 overflow-hidden">
-            <img src="/icon.svg" alt="SuppleTrack Icon" className="w-full h-full object-cover" />
+            <img src="/app-logo.png" alt="SuppleTrack Icon" className="w-full h-full object-cover" />
           </div>
           <span className="hidden sm:inline text-lg font-bold tracking-tight text-stone-900 dark:text-stone-100 font-display shrink-0">
             SuppleTrack
@@ -208,8 +208,21 @@ export const Header: React.FC<HeaderProps> = ({
             >
               {googleUser ? (
                 <>
-                  <Cloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span className="hidden lg:inline text-[11px]">Cloud</span>
+                  {googleUser.photoURL ? (
+                    <img 
+                      src={googleUser.photoURL} 
+                      alt={googleUser.displayName || 'Google'} 
+                      referrerPolicy="no-referrer"
+                      className="w-4 h-4 rounded-full object-cover border border-emerald-400"
+                    />
+                  ) : (
+                    <div className="w-4 h-4 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center">
+                      {(googleUser.displayName || googleUser.email || 'G')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <span className="hidden sm:inline text-[11px] truncate max-w-[110px] font-medium">
+                    {googleUser.displayName?.split(' ')[0] || googleUser.email?.split('@')[0]}
+                  </span>
                 </>
               ) : (
                 <>
@@ -219,7 +232,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <path fill="#FBBC05" d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.25C.45 8.17 0 9.97 0 12s.45 3.83 1.25 5.42l4.03-3.13z" />
                     <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z" />
                   </svg>
-                  <span className="hidden sm:inline">Sign In</span>
+                  <span className="hidden sm:inline">Google Sign-In</span>
                 </>
               )}
             </button>

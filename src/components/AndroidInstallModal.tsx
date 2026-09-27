@@ -208,33 +208,45 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
           </div>
 
           {/* Method 3: GitHub Actions Automated Capacitor APK Build */}
-          <div className="p-5 rounded-2xl border border-stone-300 dark:border-stone-700 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-3">
+          <div className="p-5 rounded-2xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 space-y-3">
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded-md bg-purple-600 text-white text-[10px] font-bold">
-                DIRECT APK DOWNLOAD
+                GITHUB ARTIFACT
               </span>
               <h3 className="font-bold text-sm text-stone-900 dark:text-white flex items-center gap-1.5">
-                <span>Standalone SupplePulse.apk (No Zip)</span>
+                <span>Download SupplePulse-Android-APK (.zip)</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold">
-                  ACTIVE
+                  AUTOMATED
                 </span>
               </h3>
             </div>
 
             <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-normal">
-              The GitHub Actions workflow compiles the Android project and attaches a standalone <strong>SupplePulse.apk</strong> directly to your repository's Releases. You get the raw <code>.apk</code> file directly on your phone with no zip archive to extract!
+              On every workflow run, GitHub compiles the Android project and uploads the signed <strong>SupplePulse-Android-APK (.zip)</strong> file directly under the workflow run's Artifacts.
             </p>
 
-            {/* Direct Release Link */}
+            <div className="p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 text-xs text-stone-800 dark:text-stone-200 space-y-2">
+              <p className="font-bold flex items-center gap-1.5 text-stone-900 dark:text-white">
+                <span>How to download and install on your phone:</span>
+              </p>
+              <ol className="list-decimal pl-5 space-y-1 text-[11px] text-stone-600 dark:text-stone-300">
+                <li>Go to GitHub: <strong>Actions</strong> tab.</li>
+                <li>Tap the latest workflow run (<strong>"Build Android APK"</strong>).</li>
+                <li>Scroll to the bottom under <strong>Artifacts</strong> and tap <strong>"SupplePulse-Android-APK"</strong> to download the zip file.</li>
+                <li>Open your phone's <strong>Files</strong> app (or Samsung My Files), tap the downloaded zip, tap <strong>Extract</strong>, then tap the <strong>.apk</strong> to install!</li>
+              </ol>
+            </div>
+
+            {/* Direct Link to GitHub Actions Tab */}
             <div className="pt-1">
               <a
-                href="https://github.com/Latapc/Supplement-Pulse/releases"
+                href="https://github.com/Latapc/Supplement-Pulse/actions"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs"
               >
                 <Download className="w-4 h-4" />
-                <span>Download SupplePulse.apk from GitHub Releases (Direct APK)</span>
+                <span>Open GitHub Actions to Download Artifact</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
@@ -246,7 +258,7 @@ export const AndroidInstallModal: React.FC<AndroidInstallModalProps> = ({
                 <span>Fix for "Package conflicts with an existing package":</span>
               </p>
               <p className="text-[11px] leading-relaxed">
-                If Android shows this error, it means an older build was signed with a temporary key. <strong>Uninstall the old Supple Pulse from your home screen once</strong>. Then install the new APK. All future updates will use our permanent signing key and will update smoothly in-place!
+                If Android shows this error, uninstall any older versions of Supple Pulse or SuppleTrack from your home screen once. The new build uses our permanent signing key and will update smoothly in-place from now on!
               </p>
             </div>
           </div>

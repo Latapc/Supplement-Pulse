@@ -16,16 +16,35 @@ def computeVersionName() {
     return "1.0.2"
 }
 
+// Automatically ensure deterministic debug.keystore is restored from base64 if not yet present
+File keystoreFile = file('debug.keystore')
+if (!keystoreFile.exists()) {
+    File b64File = file('debug.keystore.base64')
+    if (b64File.exists()) {
+        try {
+            byte[] decoded = b64File.text.trim().decodeBase64()
+            keystoreFile.withOutputStream { it.write(decoded) }
+            println "SuppleTrack: Restored persistent debug.keystore from base64."
+        } catch (Exception e) {
+            println "SuppleTrack: Notice - " + e.message
+        }
+    }
+}
+
+boolean hasCustomKeystore = file('debug.keystore').exists()
+
 android {
     namespace = "com.suppletrack.app"
     compileSdk = rootProject.ext.compileSdkVersion
 
     signingConfigs {
         debug {
-            storeFile file('debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+            if (hasCustomKeystore) {
+                storeFile file('debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
         }
     }
 
@@ -44,10 +63,14 @@ android {
     }
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
+            if (hasCustomKeystore) {
+                signingConfig signingConfigs.debug
+            }
         }
         release {
-            signingConfig signingConfigs.debug
+            if (hasCustomKeystore) {
+                signingConfig signingConfigs.debug
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -14,7 +14,11 @@ import { Supplement, DoseLog } from '../types/supplement';
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-export const GOOGLE_CLIENT_ID = firebaseConfig.oAuthClientId || '263377906284-iagvheipdg1ctbi8ljfhkaaliuhvvut5.apps.googleusercontent.com';
+export const GOOGLE_CLIENT_ID = 
+  (typeof window !== 'undefined' && localStorage.getItem('supplepulse_custom_client_id')) ||
+  (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
+  firebaseConfig.oAuthClientId || 
+  '263377906284-iagvheipdg1ctbi8ljfhkaaliuhvvut5.apps.googleusercontent.com';
 
 // Scopes for Google services
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';

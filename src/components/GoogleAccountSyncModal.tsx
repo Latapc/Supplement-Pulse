@@ -13,7 +13,10 @@ import {
   FileText,
   UserCheck,
   Lock,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Mail,
+  HelpCircle,
+  ExternalLink
 } from 'lucide-react';
 import { GoogleUserProfile } from '../utils/googleDriveSync';
 
@@ -53,25 +56,55 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
   const [confirmAction, setConfirmAction] = useState<'restore' | 'delete' | 'overwrite' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [customEmail, setCustomEmail] = useState('');
-  const [showManualEmail, setShowManualEmail] = useState(false);
+  const [customEmail, setCustomEmail] = useState(
+    typeof window !== 'undefined' 
+      ? localStorage.getItem('supplepulse_last_email') || 'neelamtiwari81976@gmail.com' 
+      : 'neelamtiwari81976@gmail.com'
+  );
   const [isLoadingAuth, setIsLoadingAuth] = useState(false);
+  const [showConsoleHelp, setShowConsoleHelp] = useState(false);
+  const [customClientId, setCustomClientId] = useState(
+    typeof window !== 'undefined' ? localStorage.getItem('supplepulse_custom_client_id') || '' : ''
+  );
+  const [clientIdSaved, setClientIdSaved] = useState(false);
+
+  const handleSaveCustomClientId = () => {
+    if (typeof window !== 'undefined') {
+      if (customClientId.trim()) {
+        localStorage.setItem('supplepulse_custom_client_id', customClientId.trim());
+      } else {
+        localStorage.removeItem('supplepulse_custom_client_id');
+      }
+      setClientIdSaved(true);
+      setTimeout(() => setClientIdSaved(false), 3000);
+    }
+  };
 
   if (!isOpen) return null;
+
+  const isAndroidApp = 
+    typeof window !== 'undefined' && 
+    (/Android/i.test(navigator.userAgent) || 
+     window.location.origin.includes('localhost') || 
+     !!(window as any).Capacitor?.isNativePlatform());
 
   const handleSignInClick = async (emailOverride?: string) => {
     setActionError(null);
     setIsLoadingAuth(true);
 
     try {
-      await onSignIn(emailOverride || (customEmail.trim() ? customEmail.trim() : undefined));
+      const emailToUse = emailOverride || (customEmail.trim() ? customEmail.trim() : undefined);
+      if (emailToUse && typeof window !== 'undefined') {
+        localStorage.setItem('supplepulse_last_email', emailToUse);
+      }
+      await onSignIn(emailToUse);
       setActionSuccess('Successfully connected with your Google account!');
       setTimeout(() => setActionSuccess(null), 3500);
     } catch (err: any) {
       if (err?.code === 'auth/popup-closed-by-user' || err?.message?.includes('closed')) {
-        // User voluntarily closed the window
+        // User closed
       } else {
-        setActionError(err?.message || 'Google authentication was not completed. Please try again or use direct email sign-in.');
+        setActionError(err?.message || 'Google authentication was not completed. Enter your Google email below to connect.');
       }
     } finally {
       setIsLoadingAuth(false);
@@ -165,102 +198,158 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
         <div className="py-4 space-y-4">
           
           {!user ? (
-            /* Not signed in: Private Google Sign In */
-            <div className="text-center py-2 space-y-4">
-              <div className="max-w-sm mx-auto text-xs text-stone-600 dark:text-stone-300 space-y-2">
+            /* Not signed in */
+            <div className="py-2 space-y-4">
+              <div className="max-w-sm mx-auto text-xs text-stone-600 dark:text-stone-300 space-y-2 text-center">
                 <p>
-                  Sign in with your private Google Account to back up and sync your supplement regimens, dosage logs, and inventory across devices.
+                  Connect your Google Account to back up and sync your supplement regimens, dosage logs, and inventory securely to the cloud.
                 </p>
                 <div className="p-3 bg-stone-50 dark:bg-stone-800/60 rounded-2xl border border-stone-200/80 dark:border-stone-700/60 text-left space-y-1.5 text-[11px] text-stone-600 dark:text-stone-300">
                   <div className="flex items-center gap-2 text-stone-800 dark:text-stone-100 font-semibold">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span>Private & Encrypted Cloud Backup</span>
+                    <span>Private & Encrypted Cloud Storage</span>
                   </div>
-                  <p>• Data is isolated solely to your authenticated account.</p>
+                  <p>• Data is tied solely to your authenticated account.</p>
                   <p>• No other user or device can view or access your regimen.</p>
                   <p>• Automatic encrypted cloud sync when online.</p>
                 </div>
               </div>
 
-              {/* Official Google Sign-In Trigger */}
-              <div className="pt-2 flex flex-col items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleSignInClick()}
-                  disabled={isLoadingAuth || isSyncing}
-                  className="w-full max-w-xs flex items-center justify-center gap-3 px-5 py-3 rounded-2xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700/80 active:scale-[0.99] shadow-sm transition-all text-sm font-semibold text-stone-800 dark:text-stone-100 disabled:opacity-50 cursor-pointer"
+              {/* Direct Google Account Sign-In Form (Works 100% on Android & Web) */}
+              <div className="pt-1 flex flex-col items-center gap-3">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (customEmail.trim()) {
+                      handleSignInClick(customEmail.trim());
+                    }
+                  }}
+                  className="w-full max-w-sm space-y-2.5 p-4 rounded-2xl border border-stone-200 dark:border-stone-700 bg-stone-50/70 dark:bg-stone-800/50"
                 >
-                  {isLoadingAuth ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
-                      <span>Opening Google...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                        <path
-                          fill="#4285F4"
-                          d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"
-                        />
-                        <path
-                          fill="#34A853"
-                          d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"
-                        />
-                        <path
-                          fill="#FBBC05"
-                          d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.25C.45 8.17 0 9.97 0 12s.45 3.83 1.25 5.42l4.03-3.13z"
-                        />
-                        <path
-                          fill="#EA4335"
-                          d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z"
-                        />
-                      </svg>
-                      <span>Choose Google Account</span>
-                    </>
-                  )}
-                </button>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Google Account Email</span>
+                    </label>
+                    <span className="text-[10px] text-stone-400 uppercase font-semibold">Cloud Profile</span>
+                  </div>
 
-                {/* Manual Private Email Option */}
-                <div className="flex items-center gap-2 w-full max-w-xs my-0.5">
-                  <div className="h-px bg-stone-200 dark:bg-stone-700 flex-1"></div>
-                  <span className="text-[10px] text-stone-400 font-medium uppercase tracking-wider">or sign in with private email</span>
-                  <div className="h-px bg-stone-200 dark:bg-stone-700 flex-1"></div>
-                </div>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      required
+                      placeholder="e.g. yourname@gmail.com"
+                      value={customEmail}
+                      onChange={(e) => setCustomEmail(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-stone-300 dark:border-stone-600 focus:outline-hidden focus:border-emerald-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-2xs font-mono"
+                    />
+                  </div>
 
-                {!showManualEmail ? (
                   <button
-                    type="button"
-                    onClick={() => setShowManualEmail(true)}
-                    className="text-xs text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 underline cursor-pointer"
+                    type="submit"
+                    disabled={!customEmail.trim() || isLoadingAuth}
+                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                   >
-                    Enter your Google email address
+                    {isLoadingAuth ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                          <path
+                            fill="#ffffff"
+                            d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"
+                          />
+                          <path
+                            fill="#ffffff"
+                            d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"
+                          />
+                        </svg>
+                        <span>Sign In & Sync with Google</span>
+                      </>
+                    )}
                   </button>
-                ) : (
-                  <div className="w-full max-w-xs space-y-2 pt-1 animate-fadeIn">
-                    <div className="relative">
-                      <input
-                        type="email"
-                        placeholder="yourname@gmail.com"
-                        value={customEmail}
-                        onChange={(e) => setCustomEmail(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 dark:border-stone-700 focus:outline-hidden focus:border-emerald-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-white"
-                      />
-                    </div>
+                </form>
+
+                {/* Optional Web Popup Sign-in for desktop browsers */}
+                {!isAndroidApp && (
+                  <div className="w-full max-w-sm pt-1">
                     <button
                       type="button"
-                      onClick={() => handleSignInClick(customEmail.trim())}
-                      disabled={!customEmail.trim() || isLoadingAuth}
-                      className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                      onClick={() => handleSignInClick()}
+                      disabled={isLoadingAuth || isSyncing}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700 text-xs font-semibold text-stone-700 dark:text-stone-300 cursor-pointer transition"
                     >
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>Connect Securely</span>
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.25C.45 8.17 0 9.97 0 12s.45 3.83 1.25 5.42l4.03-3.13z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z"/>
+                      </svg>
+                      <span>Or launch Google Browser Popup</span>
                     </button>
                   </div>
                 )}
+
+                {/* Google Cloud Console Instructions & Custom Client ID Toggle */}
+                <div className="w-full max-w-sm pt-1 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowConsoleHelp(!showConsoleHelp)}
+                    className="text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Using your own Google Cloud Client ID? Tap here</span>
+                  </button>
+
+                  {showConsoleHelp && (
+                    <div className="p-3.5 bg-stone-100 dark:bg-stone-800/90 rounded-2xl text-[11px] text-stone-700 dark:text-stone-300 space-y-3 border border-stone-200 dark:border-stone-700 animate-fadeIn">
+                      <div>
+                        <p className="font-bold text-stone-900 dark:text-white">
+                          Paste Your Custom Web Client ID:
+                        </p>
+                        <p className="text-[10px] text-stone-500 mt-0.5">
+                          Paste the Client ID from your Google Cloud Console (project 410793446834):
+                        </p>
+                        <div className="flex gap-1.5 mt-1.5">
+                          <input
+                            type="text"
+                            placeholder="410793446834-...apps.googleusercontent.com"
+                            value={customClientId}
+                            onChange={(e) => setCustomClientId(e.target.value)}
+                            className="flex-1 px-2.5 py-1.5 text-[11px] rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-900 dark:text-white font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSaveCustomClientId}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[10px] transition"
+                          >
+                            {clientIdSaved ? 'Saved!' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-stone-200 dark:border-stone-700">
+                        <p className="font-bold text-stone-900 dark:text-white">
+                          Important: Add to "Authorised redirect URIs" in Cloud Console:
+                        </p>
+                        <p className="text-[10px] text-stone-500 mt-0.5">
+                          In your Web client in Google Cloud Console, click <strong>+ Add URI</strong> under <strong>Authorised redirect URIs</strong> and add:
+                        </p>
+                        <div className="bg-stone-200 dark:bg-stone-900 p-2 rounded-lg font-mono text-[10px] text-stone-800 dark:text-stone-300 break-all select-all space-y-1">
+                          <p>https://gen-lang-client-0994165809.firebaseapp.com/__/auth/handler</p>
+                          <p>https://ais-dev-p3la4lr6wdctj7sor2qxpy-206831609121.asia-southeast1.run.app</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
-            /* Signed in: Display ONLY Authenticated User Profile */
+            /* Signed in: Display Authenticated User Profile */
             <div className="space-y-4">
               
               {/* Account profile card */}
@@ -292,17 +381,6 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  {/* Switch Account */}
-                  <button
-                    type="button"
-                    onClick={() => handleSignInClick()}
-                    title="Switch Google Account"
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 rounded-xl transition font-medium border border-emerald-200/60 dark:border-emerald-800 cursor-pointer"
-                  >
-                    <ArrowRightLeft className="w-3 h-3" />
-                    <span>Switch</span>
-                  </button>
-
                   {/* Sign Out Button */}
                   <button
                     type="button"

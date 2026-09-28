@@ -11,10 +11,12 @@ import {
   Sparkles, 
   User, 
   Tv,
-  Check
+  Check,
+  Shield
 } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile, ProfileType } from '../types/profile';
+import { DiscordAuthUser } from '../utils/discordAuthClient';
 
 interface HeaderProps {
   activeTab: 'today' | 'supplements' | 'trends' | 'history';
@@ -26,9 +28,11 @@ interface HeaderProps {
   onOpenAndroidInstall: () => void;
   todayDueCount: number;
   googleUser?: FirebaseUser | null;
+  discordUser?: DiscordAuthUser | null;
   isSyncing?: boolean;
   hasDriveAccess?: boolean;
   onOpenGoogleSync?: () => void;
+  onOpenDiscordSecurity?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
   activeProfile: UserProfile;
@@ -44,8 +48,10 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAndroidInstall,
   todayDueCount,
   googleUser,
+  discordUser,
   isSyncing = false,
   onOpenGoogleSync,
+  onOpenDiscordSecurity,
   theme = 'light',
   onToggleTheme,
   activeProfile,
@@ -182,6 +188,28 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-stone-900" />
             )}
           </button>
+
+          {/* Discord-Style Security / IP Guard Button */}
+          {onOpenDiscordSecurity && (
+            <button
+              onClick={onOpenDiscordSecurity}
+              title={discordUser ? `IP Verified Account: ${discordUser.email}` : 'Discord-Style Security: Email & IP Authorized Login'}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl border transition shadow-2xs cursor-pointer ${
+                discordUser
+                  ? 'bg-indigo-50 text-indigo-900 border-indigo-200/90 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white border-transparent'
+              }`}
+            >
+              <Shield className={`w-3.5 h-3.5 ${discordUser ? 'text-indigo-600 dark:text-indigo-400' : 'text-white'}`} />
+              {discordUser ? (
+                <span className="hidden sm:inline text-[11px] truncate max-w-[100px]">
+                  {discordUser.displayName || discordUser.email.split('@')[0]}
+                </span>
+              ) : (
+                <span>Security Sign-In</span>
+              )}
+            </button>
+          )}
 
           {/* Google Account / Drive Sync Button */}
           {onOpenGoogleSync && (

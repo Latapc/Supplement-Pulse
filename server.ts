@@ -1,8 +1,10 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
+import { createDiscordAuthRouter, handleVerifyIpHtml } from './server/discordAuth';
 
 dotenv.config();
 
@@ -415,8 +417,32 @@ Or tap any of the quick action pills in the chat drawer!`,
   };
 }
 
-// In-memory / file-backed user cloud backup storage
+// File-backed user cloud backup storage for multi-user isolation
+const SYNC_DB_FILE = path.join(process.cwd(), 'data', 'user_sync_db.json');
 const userCloudStores = new Map<string, any>();
+
+// Load existing synced accounts on startup
+try {
+  if (fs.existsSync(SYNC_DB_FILE)) {
+    const raw = fs.readFileSync(SYNC_DB_FILE, 'utf-8');
+    const parsed = JSON.parse(raw);
+    Object.entries(parsed).forEach(([k, v]) => userCloudStores.set(k, v));
+  }
+} catch (e) {
+  console.warn('Failed to load user_sync_db.json:', e);
+}
+
+function persistSyncDb() {
+  try {
+    const obj: Record<string, any> = {};
+    userCloudStores.forEach((v, k) => {
+      obj[k] = v;
+    });
+    fs.writeFileSync(SYNC_DB_FILE, JSON.stringify(obj, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Failed to persist user_sync_db.json:', e);
+  }
+}
 
 app.post('/api/sync/save', (req, res) => {
   const { userId, payload } = req.body;
@@ -428,6 +454,7 @@ app.post('/api/sync/save', (req, res) => {
     ...payload,
     savedAt: timestamp,
   });
+  persistSyncDb();
   return res.json({ success: true, savedAt: timestamp });
 });
 
@@ -444,9 +471,14 @@ app.delete('/api/sync/delete', (req, res) => {
   const userId = req.query.userId as string;
   if (userId) {
     userCloudStores.delete(userId);
+    persistSyncDb();
   }
   return res.json({ success: true });
 });
+
+// Discord-style Security & IP Authentication Endpoints
+app.use('/api/auth', createDiscordAuthRouter());
+app.get('/verify-ip', handleVerifyIpHtml);
 
 async function main() {
   const isProd = process.env.NODE_ENV === 'production';

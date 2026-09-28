@@ -34,6 +34,12 @@ import { ProfileSwitcherModal } from './components/ProfileSwitcherModal';
 import { GoogleCalendarModal } from './components/GoogleCalendarModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { AndroidInstallModal } from './components/AndroidInstallModal';
+import { DiscordSecurityModal } from './components/DiscordSecurityModal';
+import { 
+  DiscordAuthUser, 
+  getStoredDiscordUser, 
+  setStoredDiscordUser 
+} from './utils/discordAuthClient';
 import { User } from 'firebase/auth';
 import { 
   initGoogleAuth, 
@@ -109,6 +115,70 @@ export default function App() {
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
+  const [discordUser, setDiscordUser] = useState<DiscordAuthUser | null>(() => getStoredDiscordUser());
+  const [isDiscordSecurityOpen, setIsDiscordSecurityOpen] = useState(false);
+
+  // Discord-Style Security Regimen Handlers
+  const handleDiscordUserChange = async (user: DiscordAuthUser | null) => {
+    setDiscordUser(user);
+    setStoredDiscordUser(user);
+    if (user) {
+      try {
+        const res = await fetch(`/api/sync/load?userId=account_${user.id}`);
+        const data = await res.json();
+        if (data?.data?.supplements && Array.isArray(data.data.supplements) && data.data.supplements.length > 0) {
+          setSupplements(data.data.supplements);
+          saveSupplements(data.data.supplements);
+          if (data.data.logs) {
+            setLogs(data.data.logs);
+            saveDoseLogs(data.data.logs);
+          }
+          setToastMessage(`Logged in! Loaded ${data.data.supplements.length} supplement regimens.`);
+          return;
+        }
+      } catch (err) {
+        console.warn('Could not load user data:', err);
+      }
+      setToastMessage(`Signed in as ${user.displayName || user.email} (IP Verified)`);
+    } else {
+      setToastMessage('Signed out of Discord Security account.');
+    }
+  };
+
+  const handleDiscordSyncRegimen = async () => {
+    if (!discordUser) return;
+    const payload: CloudRegimenData = {
+      version: 1,
+      appName: 'Supple Pulse',
+      updatedAt: new Date().toISOString(),
+      userEmail: discordUser.email,
+      supplements,
+      logs,
+      dismissedDoses,
+    };
+    await fetch('/api/sync/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: `account_${discordUser.id}`, payload }),
+    });
+  };
+
+  const handleDiscordRestoreRegimen = async () => {
+    if (!discordUser) return;
+    const res = await fetch(`/api/sync/load?userId=account_${discordUser.id}`);
+    const data = await res.json();
+    if (data?.data?.supplements) {
+      setSupplements(data.data.supplements);
+      saveSupplements(data.data.supplements);
+      if (data.data.logs) {
+        setLogs(data.data.logs);
+        saveDoseLogs(data.data.logs);
+      }
+      setToastMessage(`Restored ${data.data.supplements.length} supplements from cloud!`);
+    } else {
+      setToastMessage('No backup found yet for this account. Click Back Up Now to save.');
+    }
+  };
 
   const activeProfile = useMemo(() => {
     return profiles.find((p) => p.id === activeProfileId) || profiles[0] || INITIAL_PROFILES[0];
@@ -889,9 +959,11 @@ export default function App() {
         onOpenAndroidInstall={() => setIsAndroidModalOpen(true)}
         todayDueCount={todayDueCount}
         googleUser={googleUser}
+        discordUser={discordUser}
         isSyncing={isSyncing}
         hasDriveAccess={hasDriveAccess}
         onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
+        onOpenDiscordSecurity={() => setIsDiscordSecurityOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
         activeProfile={activeProfile}
@@ -1174,6 +1246,17 @@ export default function App() {
       <AndroidInstallModal
         isOpen={isAndroidModalOpen}
         onClose={() => setIsAndroidModalOpen(false)}
+      />
+
+      {/* Discord-Style Security & IP Authorization Modal */}
+      <DiscordSecurityModal
+        isOpen={isDiscordSecurityOpen}
+        onClose={() => setIsDiscordSecurityOpen(false)}
+        currentUser={discordUser}
+        onUserChange={handleDiscordUserChange}
+        onSyncRegimen={handleDiscordSyncRegimen}
+        onRestoreRegimen={handleDiscordRestoreRegimen}
+        localSupplementsCount={supplements.length}
       />
 
       {/* Google Account Cloud Sync Modal */}

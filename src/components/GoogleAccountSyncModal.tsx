@@ -58,8 +58,8 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [customEmail, setCustomEmail] = useState(
     typeof window !== 'undefined' 
-      ? localStorage.getItem('supplepulse_last_email') || 'neelamtiwari81976@gmail.com' 
-      : 'neelamtiwari81976@gmail.com'
+      ? localStorage.getItem('supplepulse_last_email') || '' 
+      : ''
   );
   const [isLoadingAuth, setIsLoadingAuth] = useState(false);
   const [showConsoleHelp, setShowConsoleHelp] = useState(false);
@@ -119,6 +119,21 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
       setTimeout(() => setActionSuccess(null), 3500);
     } catch (err: any) {
       setActionError(err?.message || 'Sync failed');
+    }
+  };
+
+  const handleSignOutClick = async () => {
+    setActionError(null);
+    try {
+      await onSignOut();
+      setCustomEmail('');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('supplepulse_last_email');
+      }
+      setActionSuccess('Signed out. Ready for another account to connect.');
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (err: any) {
+      setActionError(err?.message || 'Sign out failed');
     }
   };
 
@@ -381,15 +396,15 @@ export const GoogleAccountSyncModal: React.FC<GoogleAccountSyncModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  {/* Sign Out Button */}
+                  {/* Sign Out / Switch Button */}
                   <button
                     type="button"
-                    onClick={onSignOut}
-                    title="Disconnect Google Account"
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white hover:bg-stone-200 dark:hover:bg-stone-700 rounded-xl transition cursor-pointer"
+                    onClick={handleSignOutClick}
+                    title="Sign out or switch to another Google Account"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-200 dark:hover:bg-stone-700 rounded-xl transition cursor-pointer font-medium"
                   >
-                    <LogOut className="w-3 h-3" />
-                    <span>Sign Out</span>
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Switch / Sign Out</span>
                   </button>
                 </div>
               </div>

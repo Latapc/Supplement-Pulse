@@ -4,7 +4,7 @@ import {
   RotateCcw, 
   PlusCircle, 
   CheckCircle2, 
-  Calendar,
+  Clock,
   Sparkles,
   Package,
   AlertTriangle,
@@ -126,7 +126,7 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
   return (
     <div className="space-y-6">
 
-      {/* Google TV Multi-Profile Switcher Strip */}
+      {/* Multi-Profile Switcher Strip */}
       {profiles.length > 1 && (
         <div className="p-3 sm:p-4 rounded-3xl bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-2 flex-wrap">
@@ -349,7 +349,7 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
                           : 'bg-stone-50 border-stone-200/70 text-stone-600'
                       }`}>
                         <div className="flex items-center gap-1.5">
-                          <Calendar className={`w-3.5 h-3.5 shrink-0 ${
+                          <Clock className={`w-3.5 h-3.5 shrink-0 ${
                             status.expiryStatus.isExpired ? 'text-rose-600' : status.expiryStatus.isNearingExpiry ? 'text-amber-600' : 'text-stone-400'
                           }`} />
                           <span>Exp: {supplement.expiryDate}</span>
@@ -649,7 +649,7 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
                     </div>
                   ) : (
                     <div className="mt-2 text-xs text-stone-500 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-stone-400" />
+                      <Clock className="w-3.5 h-3.5 text-stone-400" />
                       <span>Due {dayStr}</span>
                     </div>
                   )}

@@ -591,6 +591,12 @@ export function createDiscordAuthRouter(): express.Router {
     return res.json({ ip: clientIp });
   });
 
+  // 9. POST /api/auth/save-credentials-hook
+  // Responds to native form POSTs targeting the hidden iframe so browsers / Google Password Manager prompt to save credentials
+  router.post('/save-credentials-hook', (req, res) => {
+    return res.status(200).send('OK');
+  });
+
   return router;
 }
 

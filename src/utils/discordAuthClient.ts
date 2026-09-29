@@ -1,4 +1,7 @@
 // Client-side Discord-style Security & IP Authentication Service
+// Built with W3C Credential Management API & Android Autofill Support
+
+declare const __CLOUD_BACKEND_URL__: string | undefined;
 
 export interface DiscordAuthUser {
   id: string;
@@ -23,6 +26,50 @@ export interface SecurityEmailLog {
 
 const LOCAL_STORAGE_USER_KEY = 'supplepulse_discord_auth_user';
 
+export function getApiUrl(endpoint: string): string {
+  if (typeof window === 'undefined') return endpoint;
+  
+  const isCapacitorNative = 
+    Boolean((window as any).Capacitor?.isNativePlatform?.()) || 
+    window.location.origin === 'https://localhost' || 
+    window.location.origin.startsWith('capacitor://');
+
+  const cleanPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+  if (isCapacitorNative) {
+    const cloudUrl = (typeof __CLOUD_BACKEND_URL__ !== 'undefined' && __CLOUD_BACKEND_URL__)
+      ? __CLOUD_BACKEND_URL__
+      : 'https://ais-pre-p3la4lr6wdctj7sor2qxpy-206831609121.asia-southeast1.run.app';
+    return `${cloudUrl.replace(/\/+$/, '')}${cleanPath}`;
+  }
+
+  return cleanPath;
+}
+
+async function safeFetchJson(endpoint: string, options?: RequestInit): Promise<any> {
+  const url = getApiUrl(endpoint);
+  let res: Response;
+  try {
+    res = await fetch(url, options);
+  } catch (netErr: any) {
+    throw new Error(`Network connection error. Please ensure internet access is available (${netErr?.message || 'offline'}).`);
+  }
+
+  const text = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`Server returned unexpected response (${res.status}). Please check server connection.`);
+  }
+
+  if (!res.ok) {
+    throw new Error(data.error || data.message || `Request failed with status ${res.status}`);
+  }
+
+  return data;
+}
+
 export function getStoredDiscordUser(): DiscordAuthUser | null {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
@@ -44,8 +91,7 @@ export function setStoredDiscordUser(user: DiscordAuthUser | null) {
 
 export async function getClientIp(): Promise<string> {
   try {
-    const res = await fetch('/api/auth/client-ip');
-    const data = await res.json();
+    const data = await safeFetchJson('/api/auth/client-ip');
     return data.ip || '127.0.0.1';
   } catch {
     return '127.0.0.1';
@@ -57,33 +103,22 @@ export async function registerWithDiscordSecurity(params: {
   password: string;
   displayName?: string;
 }) {
-  const res = await fetch('/api/auth/register', {
+  return await safeFetchJson('/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Registration failed');
-  }
-  return data;
 }
 
 export async function loginWithDiscordSecurity(params: {
   email: string;
   password: string;
 }) {
-  const res = await fetch('/api/auth/login', {
+  const data = await safeFetchJson('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Login failed');
-  }
 
   if (data.authorized && data.user) {
     setStoredDiscordUser({
@@ -96,11 +131,7 @@ export async function loginWithDiscordSecurity(params: {
 }
 
 export async function checkIpAuthorizationStatus(token: string) {
-  const res = await fetch(`/api/auth/check-ip-status?token=${encodeURIComponent(token)}`);
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Check failed');
-  }
+  const data = await safeFetchJson(`/api/auth/check-ip-status?token=${encodeURIComponent(token)}`);
 
   if (data.authorized && data.user) {
     setStoredDiscordUser({
@@ -113,32 +144,25 @@ export async function checkIpAuthorizationStatus(token: string) {
 }
 
 export async function verifyTokenDirectly(token: string) {
-  const res = await fetch('/api/auth/verify-ip-token', {
+  return await safeFetchJson('/api/auth/verify-ip-token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Verification failed');
-  return data;
 }
 
 export async function resendVerificationEmail(params: { token?: string; email?: string }) {
-  const res = await fetch('/api/auth/resend-verification', {
+  return await safeFetchJson('/api/auth/resend-verification', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Resend failed');
-  return data;
 }
 
 export async function fetchRecentSecurityEmails(email?: string): Promise<SecurityEmailLog[]> {
   try {
-    const url = email ? `/api/auth/recent-emails?email=${encodeURIComponent(email)}` : '/api/auth/recent-emails';
-    const res = await fetch(url);
-    const data = await res.json();
+    const path = email ? `/api/auth/recent-emails?email=${encodeURIComponent(email)}` : '/api/auth/recent-emails';
+    const data = await safeFetchJson(path);
     return data.emails || [];
   } catch {
     return [];
@@ -146,15 +170,12 @@ export async function fetchRecentSecurityEmails(email?: string): Promise<Securit
 }
 
 export async function revokeAuthorizedIp(email: string, ipToRevoke: string) {
-  const res = await fetch('/api/auth/revoke-ip', {
+  const data = await safeFetchJson('/api/auth/revoke-ip', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, ipToRevoke }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to revoke IP');
   
-  // Update local user state if currently stored
   const current = getStoredDiscordUser();
   if (current && current.email.toLowerCase() === email.toLowerCase()) {
     current.authorizedIps = data.authorizedIps || [];
@@ -165,4 +186,64 @@ export async function revokeAuthorizedIp(email: string, ipToRevoke: string) {
 
 export function logoutDiscordUser() {
   setStoredDiscordUser(null);
+}
+
+// -------------------------------------------------------------
+// W3C Credential Management API & Password Manager Integration
+// -------------------------------------------------------------
+
+/**
+ * Triggers Google Password Manager / OS credential selector.
+ * Supported on Chrome, Android WebView, and modern password managers.
+ */
+export async function requestSavedPasswordCredentials(conditional = false): Promise<{ id: string; password?: string } | null> {
+  if (typeof window === 'undefined') return null;
+  const nav = navigator as any;
+
+  if (nav?.credentials?.get && (window as any).PasswordCredential) {
+    try {
+      const cred = await nav.credentials.get({
+        password: true,
+        mediation: conditional ? 'conditional' : 'optional',
+      });
+      if (cred && cred.id) {
+        return {
+          id: cred.id,
+          password: cred.password || '',
+        };
+      }
+    } catch {
+      // User dismissed or conditional request unfulfilled
+    }
+  }
+  return null;
+}
+
+/**
+ * Tells Google Password Manager / OS to prompt:
+ * "Save password to Google Password Manager?"
+ * Provides both email (id) and password.
+ */
+export async function promptSaveCredentialsToManager(params: {
+  email: string;
+  password: string;
+  displayName?: string;
+}): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  const nav = navigator as any;
+
+  if (nav?.credentials?.store && (window as any).PasswordCredential) {
+    try {
+      const cred = new (window as any).PasswordCredential({
+        id: params.email.trim(),
+        password: params.password,
+        name: params.displayName?.trim() || params.email.trim(),
+      });
+      await nav.credentials.store(cred);
+      return true;
+    } catch (err) {
+      console.warn('Native password manager prompt skipped:', err);
+    }
+  }
+  return false;
 }

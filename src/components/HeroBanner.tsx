@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { Clock, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import { TodaySupplementStatus } from '../types/supplement';
 import { formatCountdown } from '../utils/dates';
 
@@ -52,7 +52,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         {/* Left Side: Editorial Date & Status */}
         <div className="max-w-2xl">
           <div className="flex items-center gap-2 text-xs font-medium text-stone-400 mb-2">
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <Clock className="w-3.5 h-3.5 text-emerald-400" />
             <span>{dayName}</span>
             <span aria-hidden="true">·</span>
             <span>{formattedDate}</span>

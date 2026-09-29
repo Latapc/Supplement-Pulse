@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Calendar, Clock, RefreshCw, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
+import { AlertTriangle, Clock, RefreshCw, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 import { TodaySupplementStatus, Supplement } from '../types/supplement';
 
 interface ExpiryAlertsBannerProps {

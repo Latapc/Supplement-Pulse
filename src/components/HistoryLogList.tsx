@@ -8,17 +8,16 @@ import {
   Plus, 
   RotateCcw,
   CheckCircle2,
-  Calendar,
   Clock,
-  Cloud,
-  CloudCheck,
+  Shield,
+  ShieldCheck,
   RefreshCw,
   ExternalLink
 } from 'lucide-react';
-import { User } from 'firebase/auth';
 import { DoseLog, Supplement } from '../types/supplement';
 import { exportBackupData, importBackupData } from '../utils/storage';
 import { formatDateToYYYYMMDD } from '../utils/dates';
+import { DiscordAuthUser } from '../utils/discordAuthClient';
 
 interface HistoryLogListProps {
   logs: DoseLog[];
@@ -26,12 +25,11 @@ interface HistoryLogListProps {
   onDeleteLog: (logId: string) => void;
   onAddManualLog: (log: Omit<DoseLog, 'id'>) => void;
   onRefreshData: () => void;
-  googleUser?: User | null;
-  hasDriveAccess?: boolean;
+  discordUser?: DiscordAuthUser | null;
   isSyncing?: boolean;
   lastSyncedTime?: string | null;
-  onOpenGoogleSync?: () => void;
-  onQuickSyncToDrive?: () => Promise<void>;
+  onOpenDiscordSecurity?: () => void;
+  onQuickSyncCloud?: () => Promise<void>;
 }
 
 export const HistoryLogList: React.FC<HistoryLogListProps> = ({
@@ -40,12 +38,11 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
   onDeleteLog,
   onAddManualLog,
   onRefreshData,
-  googleUser,
-  hasDriveAccess = false,
+  discordUser,
   isSyncing = false,
   lastSyncedTime,
-  onOpenGoogleSync,
-  onQuickSyncToDrive,
+  onOpenDiscordSecurity,
+  onQuickSyncCloud,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSuppId, setFilterSuppId] = useState<string>('all');
@@ -141,18 +138,18 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Google Account Sync Button */}
-          {onOpenGoogleSync && (
+          {/* Security Account Sync Button */}
+          {onOpenDiscordSecurity && (
             <button
-              onClick={onOpenGoogleSync}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition shadow-2xs ${
-                googleUser
-                  ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/80'
+              onClick={onOpenDiscordSecurity}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition shadow-2xs cursor-pointer ${
+                discordUser
+                  ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/80'
                   : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200 border-stone-300 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800'
               }`}
             >
-              <Cloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>{googleUser ? (isSyncing ? 'Syncing...' : 'Google Synced') : 'Sync with Google'}</span>
+              <Shield className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>{discordUser ? (isSyncing ? 'Syncing...' : 'Account Synced') : 'Account Security'}</span>
             </button>
           )}
 
@@ -187,93 +184,76 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
         </div>
       </div>
 
-      {/* Google Account Cloud Sync Callout Banner */}
+      {/* Account Cloud Sync Callout Banner */}
       <div className={`p-4 rounded-2xl border transition-all ${
-        googleUser 
-          ? 'bg-emerald-50/70 dark:bg-emerald-950/70 border-emerald-200/80 dark:border-emerald-800/80 text-emerald-950 dark:text-emerald-100'
+        discordUser 
+          ? 'bg-indigo-50/70 dark:bg-indigo-950/70 border-indigo-200/80 dark:border-indigo-800/80 text-indigo-950 dark:text-indigo-100'
           : 'bg-stone-50 dark:bg-stone-900 border-stone-200/90 dark:border-stone-800 text-stone-800 dark:text-stone-100'
       }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
             <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${
-              googleUser ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300' : 'bg-stone-200/80 dark:bg-stone-800 text-stone-600 dark:text-stone-300'
+              discordUser ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300' : 'bg-stone-200/80 dark:bg-stone-800 text-stone-600 dark:text-stone-300'
             }`}>
-              <Cloud className="w-4 h-4" />
+              <ShieldCheck className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="text-xs font-bold font-display text-stone-900 dark:text-white">
-                  {googleUser ? 'Google Drive Cloud Sync Active' : 'Automate Your Data with Google Account Sync'}
+                  {discordUser ? 'Account Cloud Backup Active' : 'Discord-Style Account Security'}
                 </h4>
-                {googleUser && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-200/70 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 font-mono">
-                    {googleUser.email}
+                {discordUser && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-200/70 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-200 font-mono">
+                    {discordUser.email}
                   </span>
                 )}
               </div>
               <p className="text-[11px] text-stone-600 dark:text-stone-300 mt-0.5">
-                {googleUser
-                  ? `Your supplement protocols, daily doses, and history are automatically backed up to Google Drive (suppletrack_data.json). No manual files needed.`
-                  : `Skip manual file export/import. Connect your Google Account to automatically store and sync your supplement regimen across all your devices.`}
+                {discordUser
+                  ? `Your supplement regimens, past intake logs, and schedules are encrypted and protected under your verified account.`
+                  : `Sign in or create an account with email verification and IP address authorization to automatically protect and sync your regimens.`}
               </p>
-              {lastSyncedTime && googleUser && (
-                <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium mt-1">
-                  Last cloud sync: {lastSyncedTime}
+              {lastSyncedTime && discordUser && (
+                <p className="text-[10px] text-indigo-700 dark:text-indigo-400 font-medium mt-1">
+                  Last cloud backup: {lastSyncedTime}
                 </p>
               )}
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {googleUser ? (
+            {discordUser ? (
               <>
-                {onQuickSyncToDrive && (
+                {onQuickSyncCloud && (
                   <button
                     type="button"
-                    onClick={onQuickSyncToDrive}
+                    onClick={onQuickSyncCloud}
                     disabled={isSyncing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-2xs transition disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-2xs transition disabled:opacity-50 cursor-pointer"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                     <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
                   </button>
                 )}
-                {onOpenGoogleSync && (
+                {onOpenDiscordSecurity && (
                   <button
                     type="button"
-                    onClick={onOpenGoogleSync}
-                    className="px-3 py-1.5 bg-white text-stone-700 hover:bg-stone-100 border border-stone-200 rounded-xl text-xs font-semibold transition"
+                    onClick={onOpenDiscordSecurity}
+                    className="px-3 py-1.5 bg-white text-stone-700 hover:bg-stone-100 border border-stone-200 rounded-xl text-xs font-semibold transition cursor-pointer"
                   >
                     Manage
                   </button>
                 )}
               </>
             ) : (
-              onOpenGoogleSync && (
+              onOpenDiscordSecurity && (
                 <button
                   type="button"
-                  onClick={onOpenGoogleSync}
-                  className="flex items-center gap-2 px-3.5 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-semibold shadow-2xs transition"
+                  onClick={onOpenDiscordSecurity}
+                  className="flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer"
                 >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.25C.45 8.17 0 9.97 0 12s.45 3.83 1.25 5.42l4.03-3.13z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z"
-                    />
-                  </svg>
-                  <span>Connect Google Account</span>
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Sign In / Security</span>
                 </button>
               )
             )}
@@ -434,7 +414,7 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
 
                       <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400 mt-1">
                         <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-stone-400 dark:text-stone-500" />
+                          <Clock className="w-3 h-3 text-stone-400 dark:text-stone-500" />
                           <span>{formattedDate}</span>
                         </span>
                         {log.notes && (

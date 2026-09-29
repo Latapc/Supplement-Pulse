@@ -20,45 +20,27 @@ import {
 import { 
   HistoryLogList 
 } from './components/HistoryLogList';
-import { 
-  NotificationBanner 
-} from './components/NotificationBanner';
 import { ExpiryAlertsBanner } from './components/ExpiryAlertsBanner';
 import { AiCoachColumn } from './components/AiCoachColumn';
 import { 
   AiChatDrawer, 
   ChatActionSnapshot 
 } from './components/AiChatDrawer';
-import { GoogleAccountSyncModal } from './components/GoogleAccountSyncModal';
 import { ProfileSwitcherModal } from './components/ProfileSwitcherModal';
-import { GoogleCalendarModal } from './components/GoogleCalendarModal';
-import { NotificationsModal } from './components/NotificationsModal';
 import { AndroidInstallModal } from './components/AndroidInstallModal';
 import { DiscordSecurityModal } from './components/DiscordSecurityModal';
 import { 
   DiscordAuthUser, 
   getStoredDiscordUser, 
-  setStoredDiscordUser 
+  setStoredDiscordUser,
+  getApiUrl
 } from './utils/discordAuthClient';
-import { User } from 'firebase/auth';
-import { 
-  initGoogleAuth, 
-  signInWithGoogle, 
-  signOutFromGoogle, 
-  getGoogleAccessToken,
-  getOAuthAccessToken,
-  findDriveBackupFile, 
-  downloadFromDrive, 
-  uploadToDrive, 
-  deleteDriveFile,
-  CloudRegimenData,
-  GoogleUserProfile
-} from './utils/googleDriveSync';
 
 import { 
   Supplement, 
   DoseLog, 
-  TodaySupplementStatus 
+  TodaySupplementStatus,
+  CloudRegimenData
 } from './types/supplement';
 import { UserProfile, INITIAL_PROFILES } from './types/profile';
 import { 
@@ -89,9 +71,7 @@ import {
   Plus, 
   CheckCircle2, 
   RotateCcw, 
-  Sparkles, 
-  Bell, 
-  Calendar 
+  Sparkles 
 } from 'lucide-react';
 
 export default function App() {
@@ -106,14 +86,10 @@ export default function App() {
   const [chatSpecialMode, setChatSpecialMode] = useState<boolean>(false);
   const [chatInitialPrompt, setChatInitialPrompt] = useState<string | undefined>(undefined);
 
-  // Google TV Family & Multi-Profile States
+  // Family & Multi-Profile States
   const [profiles, setProfiles] = useState<UserProfile[]>(() => loadProfiles());
   const [activeProfileId, setActiveProfileId] = useState<string>(() => loadActiveProfileId());
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-
-  // New Integration Modals (Google Calendar, Device Notifications, Android APK)
-  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
-  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
   const [discordUser, setDiscordUser] = useState<DiscordAuthUser | null>(() => getStoredDiscordUser());
   const [isDiscordSecurityOpen, setIsDiscordSecurityOpen] = useState(false);
@@ -124,7 +100,7 @@ export default function App() {
     setStoredDiscordUser(user);
     if (user) {
       try {
-        const res = await fetch(`/api/sync/load?userId=account_${user.id}`);
+        const res = await fetch(getApiUrl(`/api/sync/load?userId=account_${user.id}`));
         const data = await res.json();
         if (data?.data?.supplements && Array.isArray(data.data.supplements) && data.data.supplements.length > 0) {
           setSupplements(data.data.supplements);
@@ -141,42 +117,60 @@ export default function App() {
       }
       setToastMessage(`Signed in as ${user.displayName || user.email} (IP Verified)`);
     } else {
-      setToastMessage('Signed out of Discord Security account.');
+      setToastMessage('Signed out of account.');
     }
   };
 
   const handleDiscordSyncRegimen = async () => {
     if (!discordUser) return;
-    const payload: CloudRegimenData = {
-      version: 1,
-      appName: 'Supple Pulse',
-      updatedAt: new Date().toISOString(),
-      userEmail: discordUser.email,
-      supplements,
-      logs,
-      dismissedDoses,
-    };
-    await fetch('/api/sync/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: `account_${discordUser.id}`, payload }),
-    });
+    setIsSyncing(true);
+    try {
+      const payload: CloudRegimenData = {
+        version: 1,
+        appName: 'Supple Pulse',
+        updatedAt: new Date().toISOString(),
+        userEmail: discordUser.email,
+        supplements,
+        logs,
+        dismissedDoses,
+      };
+      await fetch(getApiUrl('/api/sync/save'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: `account_${discordUser.id}`, payload }),
+      });
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setLastSyncedTime(timeStr);
+    } catch (e) {
+      console.warn('Sync failed:', e);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleDiscordRestoreRegimen = async () => {
     if (!discordUser) return;
-    const res = await fetch(`/api/sync/load?userId=account_${discordUser.id}`);
-    const data = await res.json();
-    if (data?.data?.supplements) {
-      setSupplements(data.data.supplements);
-      saveSupplements(data.data.supplements);
-      if (data.data.logs) {
-        setLogs(data.data.logs);
-        saveDoseLogs(data.data.logs);
+    setIsSyncing(true);
+    try {
+      const res = await fetch(getApiUrl(`/api/sync/load?userId=account_${discordUser.id}`));
+      const data = await res.json();
+      if (data?.data?.supplements) {
+        setSupplements(data.data.supplements);
+        saveSupplements(data.data.supplements);
+        if (data.data.logs) {
+          setLogs(data.data.logs);
+          saveDoseLogs(data.data.logs);
+        }
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setLastSyncedTime(timeStr);
+        setToastMessage(`Restored ${data.data.supplements.length} supplements from cloud!`);
+      } else {
+        setToastMessage('No backup found yet for this account. Click Back Up Now to save.');
       }
-      setToastMessage(`Restored ${data.data.supplements.length} supplements from cloud!`);
-    } else {
-      setToastMessage('No backup found yet for this account. Click Back Up Now to save.');
+    } catch (e) {
+      console.warn('Restore failed:', e);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -403,207 +397,19 @@ export default function App() {
     }
   });
 
-  // Google Account Cloud Sync State
-  const [googleUser, setGoogleUser] = useState<GoogleUserProfile | User | any | null>(null);
-  const [hasDriveAccess, setHasDriveAccess] = useState<boolean>(false);
+  // Account Security & Cloud Sync State
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
-  const [cloudFileId, setCloudFileId] = useState<string | null>(null);
-  const [isGoogleSyncModalOpen, setIsGoogleSyncModalOpen] = useState<boolean>(false);
   const autoSyncTimeoutRef = useRef<any>(null);
   const isFirstLoadRef = useRef<boolean>(true);
 
-  // Initialize Google Auth state listener
-  useEffect(() => {
-    const unsubscribe = initGoogleAuth(async (user, token) => {
-      setGoogleUser(user);
-      setHasDriveAccess(!!token);
-      if (user && token) {
-        try {
-          const found = await findDriveBackupFile(token);
-          if (found) {
-            setCloudFileId(found.id);
-            setLastSyncedTime(new Date(found.modifiedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-          }
-        } catch (e) {
-          console.error('Error looking up Drive file:', e);
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Google Sign-In Action
-  const handleSignInWithGoogle = async (customEmail?: string) => {
-    setIsSyncing(true);
-    try {
-      const { user, accessToken } = await signInWithGoogle(customEmail);
-      setGoogleUser(user);
-      setHasDriveAccess(true);
-
-      // Look for existing file in Google Cloud Store
-      const existing = await findDriveBackupFile(accessToken);
-      if (existing) {
-        setCloudFileId(existing.id);
-        const cloudData = await downloadFromDrive(accessToken, existing.id);
-        if (cloudData && Array.isArray(cloudData.supplements) && cloudData.supplements.length > 0) {
-          // Sync cloud data to local state
-          setSupplements(cloudData.supplements);
-          saveSupplements(cloudData.supplements);
-          if (cloudData.logs) {
-            setLogs(cloudData.logs);
-            saveDoseLogs(cloudData.logs);
-          }
-          if (cloudData.dismissedDoses) {
-            setDismissedDoses(cloudData.dismissedDoses);
-            localStorage.setItem('suppletrack_dismissed_doses_v1', JSON.stringify(cloudData.dismissedDoses));
-          }
-          const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          setLastSyncedTime(timeStr);
-          setToastMessage(`Google Drive connected! Synced ${cloudData.supplements.length} supplement regimens.`);
-          return;
-        }
-      }
-
-      // If no file exists in Drive yet, create initial backup with current local data
-      const payload: CloudRegimenData = {
-        version: 1,
-        appName: 'Supple Pulse',
-        updatedAt: new Date().toISOString(),
-        userEmail: user.email || undefined,
-        supplements,
-        logs,
-        dismissedDoses,
-      };
-      const result = await uploadToDrive(accessToken, payload, existing?.id);
-      setCloudFileId(result.fileId);
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setLastSyncedTime(timeStr);
-      setToastMessage('Google Drive connected! Initial regimen saved to cloud.');
-    } catch (e: any) {
-      console.error('Google Sign-in error:', e);
-      throw e;
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Google Sign-Out
-  const handleSignOutGoogle = async () => {
-    await signOutFromGoogle();
-    setGoogleUser(null);
-    setHasDriveAccess(false);
-    setCloudFileId(null);
-    setLastSyncedTime(null);
-    setToastMessage('Disconnected from Google Account.');
-  };
-
-  // Upload/Sync current state to Drive
-  const handleSyncToDrive = async () => {
-    let token = getGoogleAccessToken();
-    if (!token) {
-      const res = await signInWithGoogle();
-      token = res.accessToken;
-      setGoogleUser(res.user);
-      setHasDriveAccess(true);
-    }
-    setIsSyncing(true);
-    try {
-      const payload: CloudRegimenData = {
-        version: 1,
-        appName: 'Supple Pulse',
-        updatedAt: new Date().toISOString(),
-        userEmail: googleUser?.email || undefined,
-        supplements,
-        logs,
-        dismissedDoses,
-      };
-      const result = await uploadToDrive(token, payload, cloudFileId);
-      setCloudFileId(result.fileId);
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setLastSyncedTime(timeStr);
-      setToastMessage(`Synced to Google Drive (${timeStr})`);
-    } catch (e: any) {
-      console.error('Error syncing to drive:', e);
-      throw e;
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Restore state from Google Drive
-  const handleRestoreFromDrive = async () => {
-    let token = getGoogleAccessToken();
-    if (!token) {
-      const res = await signInWithGoogle();
-      token = res.accessToken;
-      setGoogleUser(res.user);
-      setHasDriveAccess(true);
-    }
-    setIsSyncing(true);
-    try {
-      let fileId = cloudFileId;
-      if (!fileId) {
-        const found = await findDriveBackupFile(token);
-        if (!found) {
-          throw new Error('No Supple Pulse backup file found in your Google Drive.');
-        }
-        fileId = found.id;
-        setCloudFileId(found.id);
-      }
-      const cloudData = await downloadFromDrive(token, fileId);
-      if (!cloudData || !Array.isArray(cloudData.supplements)) {
-        throw new Error('Invalid data format in Google Drive file.');
-      }
-      setSupplements(cloudData.supplements);
-      saveSupplements(cloudData.supplements);
-      if (cloudData.logs) {
-        setLogs(cloudData.logs);
-        saveDoseLogs(cloudData.logs);
-      }
-      if (cloudData.dismissedDoses) {
-        setDismissedDoses(cloudData.dismissedDoses);
-        localStorage.setItem('suppletrack_dismissed_doses_v1', JSON.stringify(cloudData.dismissedDoses));
-      }
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setLastSyncedTime(timeStr);
-      setToastMessage(`Restored ${cloudData.supplements.length} supplements from Google Drive!`);
-    } catch (e: any) {
-      console.error('Error restoring from drive:', e);
-      throw e;
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Delete cloud backup file
-  const handleDeleteCloudBackup = async () => {
-    const token = getGoogleAccessToken();
-    if (!token || !cloudFileId) {
-      throw new Error('Cannot delete file: No active Google Drive session or file ID.');
-    }
-    setIsSyncing(true);
-    try {
-      await deleteDriveFile(token, cloudFileId);
-      setCloudFileId(null);
-      setLastSyncedTime(null);
-      setToastMessage('Google Drive backup file removed.');
-    } catch (e: any) {
-      console.error('Error deleting cloud file:', e);
-      throw e;
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Auto-sync debounced effect: automatically sync changes to Drive when connected
+  // Auto-sync debounced effect: automatically sync changes to encrypted cloud when signed in
   useEffect(() => {
     if (isFirstLoadRef.current) {
       isFirstLoadRef.current = false;
       return;
     }
-    const token = getGoogleAccessToken();
-    if (!googleUser || !token || !hasDriveAccess) return;
+    if (!discordUser) return;
 
     if (autoSyncTimeoutRef.current) {
       clearTimeout(autoSyncTimeoutRef.current);
@@ -611,20 +417,10 @@ export default function App() {
 
     autoSyncTimeoutRef.current = setTimeout(async () => {
       try {
-        const payload: CloudRegimenData = {
-          version: 1,
-          appName: 'Supple Pulse',
-          updatedAt: new Date().toISOString(),
-          userEmail: googleUser.email || undefined,
-          supplements,
-          logs,
-          dismissedDoses,
-        };
-        const result = await uploadToDrive(token, payload, cloudFileId);
-        setCloudFileId(result.fileId);
+        await handleDiscordSyncRegimen();
         setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       } catch (e) {
-        console.error('Auto-sync to Google Drive error:', e);
+        console.warn('Auto-sync error:', e);
       }
     }, 2500);
 
@@ -633,7 +429,7 @@ export default function App() {
         clearTimeout(autoSyncTimeoutRef.current);
       }
     };
-  }, [supplements, logs, dismissedDoses, googleUser, hasDriveAccess, cloudFileId]);
+  }, [supplements, logs, dismissedDoses, discordUser]);
 
   // Calculate today's status for all supplements
   const todayDateStr = formatDateToYYYYMMDD(currentTime);
@@ -952,17 +748,10 @@ export default function App() {
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        notificationsEnabled={notificationPermission === 'granted'}
-        onOpenNotifications={() => setIsNotificationsModalOpen(true)}
-        onOpenCalendarSync={() => setIsCalendarModalOpen(true)}
         onOpenProfileSwitcher={() => setIsProfileModalOpen(true)}
         onOpenAndroidInstall={() => setIsAndroidModalOpen(true)}
         todayDueCount={todayDueCount}
-        googleUser={googleUser}
         discordUser={discordUser}
-        isSyncing={isSyncing}
-        hasDriveAccess={hasDriveAccess}
-        onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
         onOpenDiscordSecurity={() => setIsDiscordSecurityOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
@@ -1003,16 +792,6 @@ export default function App() {
               }}
               onRefillStock={handleRefillStock}
             />
-
-            {/* Notification Permission Request Banner (if not yet granted) */}
-            {notificationPermission !== 'granted' && (
-              <NotificationBanner
-                permission={notificationPermission}
-                onRequestPermission={handleRequestNotificationPermission}
-                onSendTestNotification={handleSendTestNotification}
-                onTestSound={handleTestSound}
-              />
-            )}
 
             {/* AI Coach Column in Today View */}
             <AiCoachColumn
@@ -1163,12 +942,11 @@ export default function App() {
               setSupplements(loadSupplements());
               setLogs(loadDoseLogs());
             }}
-            googleUser={googleUser}
-            hasDriveAccess={hasDriveAccess}
+            discordUser={discordUser}
             isSyncing={isSyncing}
             lastSyncedTime={lastSyncedTime}
-            onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
-            onQuickSyncToDrive={handleSyncToDrive}
+            onOpenDiscordSecurity={() => setIsDiscordSecurityOpen(true)}
+            onQuickSyncCloud={handleDiscordSyncRegimen}
           />
         )}
 
@@ -1184,13 +962,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4 text-stone-500">
-            <button
-              onClick={handleSendTestNotification}
-              className="hover:text-stone-900 transition"
-            >
-              Test Alert System
-            </button>
-            <span aria-hidden="true">·</span>
             <button
               onClick={handleResetData}
               className="hover:text-stone-900 transition"
@@ -1215,7 +986,7 @@ export default function App() {
         activeProfileId={activeProfileId}
       />
 
-      {/* Google TV Family & Multi-Profile Switcher Modal */}
+      {/* Family & Multi-Profile Switcher Modal */}
       <ProfileSwitcherModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -1224,22 +995,6 @@ export default function App() {
         onSelectProfile={handleSelectProfile}
         onSaveProfiles={handleSaveProfiles}
         onDeleteProfile={handleDeleteProfile}
-      />
-
-      {/* Google Calendar Sync Modal */}
-      <GoogleCalendarModal
-        isOpen={isCalendarModalOpen}
-        onClose={() => setIsCalendarModalOpen(false)}
-        supplements={supplements}
-        profiles={profiles}
-        userEmail={googleUser?.email}
-      />
-
-      {/* Device & Browser Dose Notifications Modal */}
-      <NotificationsModal
-        isOpen={isNotificationsModalOpen}
-        onClose={() => setIsNotificationsModalOpen(false)}
-        activeProfileName={activeProfile.name}
       />
 
       {/* Android APK & Mobile Application Hub Modal */}
@@ -1257,24 +1012,6 @@ export default function App() {
         onSyncRegimen={handleDiscordSyncRegimen}
         onRestoreRegimen={handleDiscordRestoreRegimen}
         localSupplementsCount={supplements.length}
-      />
-
-      {/* Google Account Cloud Sync Modal */}
-      <GoogleAccountSyncModal
-        isOpen={isGoogleSyncModalOpen}
-        onClose={() => setIsGoogleSyncModalOpen(false)}
-        user={googleUser}
-        hasDriveAccess={hasDriveAccess}
-        isSyncing={isSyncing}
-        lastSyncedTime={lastSyncedTime}
-        cloudFileId={cloudFileId}
-        localSupplementsCount={supplements.length}
-        localLogsCount={logs.length}
-        onSignIn={handleSignInWithGoogle}
-        onSignOut={handleSignOutGoogle}
-        onSyncToDrive={handleSyncToDrive}
-        onRestoreFromDrive={handleRestoreFromDrive}
-        onDeleteCloudBackup={handleDeleteCloudBackup}
       />
 
       {/* AI Chat Drawer */}

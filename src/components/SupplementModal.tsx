@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, 
-  Calendar, 
   Clock, 
   Sparkles, 
   Check, 
   Info,
   Package,
   AlertTriangle,
-  Bell,
   Infinity as InfinityIcon,
   Repeat
 } from 'lucide-react';
@@ -387,7 +385,7 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* Profile Assignment (Google TV Style) */}
+          {/* Profile Assignment */}
           {profiles.length > 0 && (
             <div>
               <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1.5">
@@ -716,7 +714,7 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
             <div className="pt-3 border-t border-stone-200/80">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
                 <label className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                  <Clock className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Bottle Expiry Date</span>
                   <span className="text-[10px] font-normal text-stone-500">(Optional)</span>
                 </label>
@@ -931,7 +929,7 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
                 </div>
 
                 <div className="text-xs text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 flex items-center gap-1.5">
-                  <Bell className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>
                     Reminders are active until <strong>{calculatedEndDate}</strong>. On <strong>{calculatedEndDate}</strong>, notifications automatically deactivate.
                   </span>

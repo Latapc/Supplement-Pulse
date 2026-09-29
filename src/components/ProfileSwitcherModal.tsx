@@ -106,7 +106,6 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
         accentColor: formType === 'kid' ? '#f43f5e' : formType === 'assisted' ? '#3b82f6' : '#10b981',
         isPrimary: false,
         pinCode: formType === 'kid' ? (formPin || '1234') : undefined,
-        calendarColorId: formType === 'kid' ? '5' : formType === 'assisted' ? '9' : '10',
         notes: formNotes.trim(),
       };
       const updated = [...profiles, newProfile];
@@ -170,18 +169,18 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
         className="w-full max-w-2xl bg-white dark:bg-[#1a1714] border border-stone-300 dark:border-stone-700 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header - Google TV Style */}
+        {/* Header - Family & Care Profiles */}
         <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-stone-200 dark:border-stone-700 flex items-center justify-between bg-stone-100 dark:bg-[#231f1c]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-              <Tv className="w-5 h-5" />
+              <Users className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-bold font-syne text-stone-900 dark:text-white">
                 Who's Taking Supplements?
               </h2>
               <p className="text-xs text-stone-600 dark:text-stone-300 font-medium">
-                Google TV-style family & care profiles under your same Google Account
+                Family & care profiles for everyone in your household
               </p>
             </div>
           </div>
@@ -242,7 +241,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
             </div>
           )}
 
-          {/* Profile Cards Grid - Google TV Aesthetic */}
+          {/* Profile Cards Grid */}
           {!editingProfile && !isCreating && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -332,10 +331,10 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                 <ShieldAlert className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <p className="font-bold text-stone-900 dark:text-white text-xs">
-                    Shared Google Account Architecture
+                    Independent Family Care Architecture
                   </p>
                   <p className="text-stone-700 dark:text-stone-300 leading-relaxed font-normal">
-                    Just like Google TV and YouTube Kids, all profiles are secured within your single Google Account. Dad's heart vitamins and kids' chewables stay neatly segregated while syncing seamlessly to Google Calendar and notifications!
+                    All household profiles stay neatly segregated with personalized regimens, dosage intervals, and parental safety PIN locks.
                   </p>
                 </div>
               </div>

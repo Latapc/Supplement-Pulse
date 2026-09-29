@@ -9,9 +9,8 @@ export interface UserProfile {
   themeGradient: string; // Tailwind gradient classes
   accentColor: string; // Primary hex/color tag
   isPrimary?: boolean;
-  pinCode?: string; // Optional PIN for parental control / kid lock (like Google TV Kids)
+  pinCode?: string; // Optional PIN for parental control / kid lock
   notes?: string;
-  calendarColorId?: string; // Google Calendar event color (e.g., '1' lavender, '2' sage, '5' yellow, '10' green, '11' flamingo)
   dailyWaterGoalMl?: number;
   ageOrBirthYear?: string;
 }
@@ -26,7 +25,6 @@ export const INITIAL_PROFILES: UserProfile[] = [
     themeGradient: 'from-emerald-500 to-teal-700',
     accentColor: '#10b981',
     isPrimary: true,
-    calendarColorId: '10', // Basil / Green
     notes: 'Primary personal regimen: Vitamin D3 booster, Cyclic Boron, B12, Magnesium & Omega-3.',
   },
   {
@@ -38,7 +36,6 @@ export const INITIAL_PROFILES: UserProfile[] = [
     themeGradient: 'from-blue-600 to-indigo-800',
     accentColor: '#3b82f6',
     isPrimary: false,
-    calendarColorId: '9', // Blueberry / Blue
     notes: 'Dad\'s daily wellness: CoQ10 100mg for cardiovascular cellular energy, Senior 50+ Multi, Calcium + D3 with breakfast.',
   },
   {
@@ -50,7 +47,6 @@ export const INITIAL_PROFILES: UserProfile[] = [
     themeGradient: 'from-amber-400 via-rose-400 to-purple-500',
     accentColor: '#f43f5e',
     isPrimary: false,
-    calendarColorId: '5', // Banana / Yellow
     pinCode: '1234', // Default child-lock PIN (easily changed in settings)
     notes: 'Kids chewable multivitamin gummies & DHA Omega-3 gummies for brain development.',
   }

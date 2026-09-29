@@ -123,3 +123,14 @@ export interface TodaySupplementStatus {
   expiryStatus?: ExpiryStatusInfo;
 }
 
+export interface CloudRegimenData {
+  version: number;
+  appName: string;
+  updatedAt: string;
+  userEmail?: string;
+  supplements: Supplement[];
+  logs: DoseLog[];
+  dismissedDoses: Record<string, string[]>;
+}
+
+

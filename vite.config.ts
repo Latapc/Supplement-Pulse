@@ -79,6 +79,9 @@ export default defineConfig(() => {
         '@': path.resolve(import.meta.dirname || '.'),
       },
     },
+    define: {
+      __CLOUD_BACKEND_URL__: JSON.stringify(process.env.APP_URL || 'https://ais-pre-p3la4lr6wdctj7sor2qxpy-206831609121.asia-southeast1.run.app'),
+    },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},

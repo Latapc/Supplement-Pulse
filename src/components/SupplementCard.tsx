@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  Calendar, 
   Clock, 
   Hourglass, 
   RotateCw, 
@@ -13,7 +12,6 @@ import {
   Package,
   AlertTriangle,
   RefreshCw,
-  BellOff,
   Infinity as InfinityIcon,
   Repeat
 } from 'lucide-react';
@@ -125,7 +123,7 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
           <div>
             {isExpired ? (
               <span className="text-stone-600 dark:text-stone-300 font-semibold flex items-center gap-1 bg-stone-100 dark:bg-stone-800 px-2.5 py-0.5 rounded-lg">
-                <BellOff className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
+                <Clock className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
                 Course Completed (Inactive)
               </span>
             ) : isInfinity ? (
@@ -160,7 +158,7 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
         {/* Schedule details */}
         <div className="mt-4 space-y-2 text-xs text-stone-600 dark:text-stone-300">
           <div className="flex items-center gap-2">
-            <Calendar className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500 shrink-0" />
+            <Clock className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500 shrink-0" />
             <span className="font-medium text-stone-800 dark:text-stone-200">{scheduleDescription}</span>
           </div>
 
@@ -272,7 +270,7 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
               : 'bg-stone-50 dark:bg-stone-800/80 border-stone-200/80 dark:border-stone-700 text-stone-700 dark:text-stone-200'
           }`}>
             <div className="flex items-center gap-2">
-              <Calendar className={`w-3.5 h-3.5 shrink-0 ${
+              <Clock className={`w-3.5 h-3.5 shrink-0 ${
                 status.expiryStatus.isExpired ? 'text-rose-600 dark:text-rose-400' : status.expiryStatus.isNearingExpiry ? 'text-amber-600 dark:text-amber-400' : 'text-stone-400 dark:text-stone-500'
               }`} />
               <div>
@@ -337,7 +335,7 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
 
             {isExpired && (
               <div className="mt-2 pt-2 border-t border-stone-200/60 dark:border-stone-700 text-[11px] text-stone-500 dark:text-stone-400 leading-snug flex items-center gap-1.5">
-                <BellOff className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                 <span>Period completed. Reminders and timer notifications automatically deactivated.</span>
               </div>
             )}

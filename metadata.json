@@ -1,6 +1,6 @@
 {
   "name": "Supple Pulse - Supplement & Vitamin Regimen Tracker",
-  "description": "Smart supplement regimen tracker with multiple profiles, Google Calendar sync, dosage countdowns, notifications, and adherence analytics.",
+  "description": "Smart supplement regimen tracker with multiple profiles, dosage countdowns, Discord-style IP security, and adherence analytics.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

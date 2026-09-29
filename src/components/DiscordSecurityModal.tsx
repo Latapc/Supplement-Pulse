@@ -12,17 +12,15 @@ import {
   X, 
   LogOut, 
   Laptop, 
-  Smartphone, 
   Trash2, 
   ExternalLink, 
-  Copy, 
   ArrowRight,
   Eye,
   EyeOff,
   CloudUpload,
   CloudDownload,
   Inbox,
-  Clock
+  KeyRound
 } from 'lucide-react';
 import { 
   DiscordAuthUser, 
@@ -35,7 +33,10 @@ import {
   fetchRecentSecurityEmails, 
   revokeAuthorizedIp, 
   logoutDiscordUser,
-  getClientIp
+  getClientIp,
+  requestSavedPasswordCredentials,
+  promptSaveCredentialsToManager,
+  getApiUrl
 } from '../utils/discordAuthClient';
 
 interface DiscordSecurityModalProps {
@@ -86,12 +87,21 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
   // Polling ref
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch client IP on open
+  // Fetch client IP on open & register conditional mediation for Password Managers
   useEffect(() => {
     if (isOpen) {
       getClientIp().then(setCurrentIp);
       setErrorMsg(null);
       setSuccessMsg(null);
+
+      // Trigger conditional mediation so Google Password Manager / Autofill
+      // attaches to the username/password fields immediately
+      requestSavedPasswordCredentials(true).then((cred) => {
+        if (cred && cred.id) {
+          setEmail(cred.id);
+          if (cred.password) setPassword(cred.password);
+        }
+      });
     }
   }, [isOpen]);
 
@@ -125,7 +135,6 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
           setTimeout(() => setSuccessMsg(null), 4000);
         }
       } catch (err: any) {
-        // If expired
         if (err?.message?.includes('expired')) {
           if (pollTimerRef.current) clearInterval(pollTimerRef.current);
           setErrorMsg('Authorization link expired. Please request a new one.');
@@ -149,18 +158,46 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
     return () => clearInterval(t);
   }, [resendCooldown]);
 
+  // Trigger Google Password Manager / OS Autofill bottom sheet when tapping fields
+  const handleTriggerAutofill = async () => {
+    if (!email && !password) {
+      const cred = await requestSavedPasswordCredentials(false);
+      if (cred && cred.id) {
+        setEmail(cred.id);
+        if (cred.password) setPassword(cred.password);
+      }
+    }
+  };
+
   if (!isOpen) return null;
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    // If fields are incomplete, stop submission
+    if (!email.trim() || !password) {
+      e.preventDefault();
+      setErrorMsg('Email and password are required');
+      return;
+    }
+
     setErrorMsg(null);
     setIsLoading(true);
 
+    const targetEmail = email.trim();
+    const targetPassword = password;
+    const targetName = displayName.trim() || undefined;
+
+    // Prompt Google / OS Password Manager to save credentials via W3C API
+    promptSaveCredentialsToManager({
+      email: targetEmail,
+      password: targetPassword,
+      displayName: targetName,
+    });
+
     try {
       const res = await registerWithDiscordSecurity({
-        email: email.trim(),
-        password,
-        displayName: displayName.trim() || undefined,
+        email: targetEmail,
+        password: targetPassword,
+        displayName: targetName,
       });
 
       if (res.requiresIpVerification) {
@@ -181,14 +218,30 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    // If fields are incomplete, stop submission
+    if (!email.trim() || !password) {
+      e.preventDefault();
+      setErrorMsg('Email and password are required');
+      return;
+    }
+
     setErrorMsg(null);
     setIsLoading(true);
 
+    const targetEmail = email.trim();
+    const targetPassword = password;
+
+    // Prompt Google / OS Password Manager to save credentials via W3C API
+    promptSaveCredentialsToManager({
+      email: targetEmail,
+      password: targetPassword,
+      displayName: targetEmail.split('@')[0],
+    });
+
     try {
       const res = await loginWithDiscordSecurity({
-        email: email.trim(),
-        password,
+        email: targetEmail,
+        password: targetPassword,
       });
 
       if (res.authorized && res.user) {
@@ -237,7 +290,6 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
     setIsLoading(true);
     try {
       await verifyTokenDirectly(token);
-      // Trigger instant check
       const res = await checkIpAuthorizationStatus(token);
       if (res.authorized && res.user) {
         setPendingAuth(null);
@@ -294,14 +346,14 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold font-display text-white">
-                    Discord-Style Security
+                    Account Security
                   </h3>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-800">
-                    IP Guard
+                    Discord-Style IP Guard
                   </span>
                 </div>
                 <p className="text-xs text-stone-400">
-                  Email verification & new IP address authorization
+                  Password protected & IP address authorization
                 </p>
               </div>
             </div>
@@ -374,13 +426,12 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                     </span>
                   </div>
                   <p className="text-[11px] text-stone-400 border-t border-stone-800/80 pt-2">
-                    💡 This window automatically detects when you open the link in your email and logs you in instantly (no refresh needed!).
+                    💡 This window automatically detects when you open the link in your email and logs you in instantly.
                   </p>
                 </div>
 
                 {/* Action buttons */}
                 <div className="pt-2 flex flex-col gap-2 max-w-md mx-auto">
-                  {/* View Security Mailbox / 1-Click Authorize button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -425,7 +476,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                       setTab('login');
                       setErrorMsg(null);
                     }}
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                       tab === 'login'
                         ? 'bg-indigo-600 text-white shadow-sm'
                         : 'text-stone-400 hover:text-white'
@@ -439,7 +490,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                       setTab('register');
                       setErrorMsg(null);
                     }}
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                       tab === 'register'
                         ? 'bg-indigo-600 text-white shadow-sm'
                         : 'text-stone-400 hover:text-white'
@@ -449,38 +500,59 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                   </button>
                 </div>
 
-                {/* Discord Security Explanation */}
+                {/* Password Manager Hint */}
                 <div className="p-3 bg-stone-900/80 rounded-2xl border border-stone-800 text-xs text-stone-300 space-y-1.5">
                   <div className="flex items-center justify-between text-stone-200 font-semibold">
                     <span className="flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>Discord-Style IP Protection</span>
+                      <KeyRound className="w-4 h-4 text-amber-400" />
+                      <span>Password Manager & IP Guard</span>
                     </span>
                     <span className="text-[11px] font-mono text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded-md border border-indigo-900">
                       IP: {currentIp}
                     </span>
                   </div>
                   <p className="text-[11px] text-stone-400">
-                    {tab === 'register'
-                      ? 'Creating an account will send an IP authorization link to your email to verify this device.'
-                      : 'Signing in on a new device or IP will automatically email you an IP authorization link before granting access.'}
+                    Tap the email or password field to choose saved credentials. When you press Enter or sign in, your browser or password manager will prompt to save your login.
                   </p>
                 </div>
 
-                {/* Form */}
+                {/* Hidden iframe for seamless Google Password Manager & Browser form capture */}
+                <iframe
+                  name="auth-credential-frame"
+                  id="auth-credential-frame"
+                  title="Credential Receiver"
+                  className="hidden"
+                  style={{ display: 'none', width: 0, height: 0, border: 0 }}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
+
+                {/* Standard HTML Form for Google Password Manager & Browser Autofill */}
                 <form
+                  id={tab === 'login' ? 'login-form' : 'register-form'}
+                  name={tab === 'login' ? 'loginForm' : 'registerForm'}
+                  method="post"
+                  action={getApiUrl('/api/auth/save-credentials-hook')}
+                  target="auth-credential-frame"
+                  autoComplete="on"
                   onSubmit={tab === 'login' ? handleLoginSubmit : handleRegisterSubmit}
                   className="space-y-3 pt-1"
                 >
                   {tab === 'register' && (
                     <div>
-                      <label className="block text-xs font-bold text-stone-300 mb-1">
+                      <label 
+                        htmlFor="register-displayname"
+                        className="block text-xs font-bold text-stone-300 mb-1"
+                      >
                         Your Name / Display Name
                       </label>
                       <div className="relative">
-                        <User className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
+                        <User className="w-4 h-4 text-stone-500 absolute left-3 top-3 pointer-events-none" />
                         <input
+                          id="register-displayname"
+                          name="name"
                           type="text"
+                          autoComplete="name"
                           placeholder="e.g. Alex"
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
@@ -491,16 +563,37 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                   )}
 
                   <div>
-                    <label className="block text-xs font-bold text-stone-300 mb-1">
-                      Email Address
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label 
+                        htmlFor="auth-email-input"
+                        className="block text-xs font-bold text-stone-300"
+                      >
+                        Email Address
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleTriggerAutofill}
+                        className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+                      >
+                        <KeyRound className="w-3 h-3" />
+                        <span>Autofill</span>
+                      </button>
+                    </div>
                     <div className="relative">
-                      <Mail className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
+                      <Mail className="w-4 h-4 text-stone-500 absolute left-3 top-3 pointer-events-none" />
                       <input
+                        id="auth-email-input"
+                        name="username"
                         type="email"
                         required
+                        autoComplete="username email"
+                        inputMode="email"
+                        autoCapitalize="none"
+                        spellCheck={false}
                         placeholder="you@example.com"
                         value={email}
+                        onFocus={handleTriggerAutofill}
+                        onClick={handleTriggerAutofill}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-stone-700 bg-stone-900 text-xs text-white placeholder-stone-500 focus:outline-hidden focus:border-indigo-500 font-mono"
                       />
@@ -508,24 +601,34 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-stone-300 mb-1">
+                    <label 
+                      htmlFor="auth-password-input"
+                      className="block text-xs font-bold text-stone-300 mb-1"
+                    >
                       Password (min 6 characters)
                     </label>
                     <div className="relative">
-                      <Lock className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
+                      <Lock className="w-4 h-4 text-stone-500 absolute left-3 top-3 pointer-events-none" />
                       <input
+                        id="auth-password-input"
+                        name="password"
                         type={showPassword ? 'text' : 'password'}
                         required
                         minLength={6}
+                        autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                        spellCheck={false}
                         placeholder="••••••••"
                         value={password}
+                        onFocus={handleTriggerAutofill}
+                        onClick={handleTriggerAutofill}
                         onChange={(e) => setPassword(e.target.value)}
                         className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-stone-700 bg-stone-900 text-xs text-white placeholder-stone-500 focus:outline-hidden focus:border-indigo-500"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-2.5 text-stone-500 hover:text-stone-300"
+                        className="absolute right-3 top-2.5 text-stone-500 hover:text-stone-300 cursor-pointer"
+                        title={showPassword ? 'Hide password' : 'Show password'}
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -534,6 +637,8 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
 
                   <button
                     type="submit"
+                    name="submit"
+                    value="submit"
                     disabled={isLoading}
                     className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 mt-2"
                   >
@@ -544,7 +649,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                       </>
                     ) : (
                       <>
-                        <span>{tab === 'login' ? 'Sign In & Check IP' : 'Create Account & Send IP Link'}</span>
+                        <span>{tab === 'login' ? 'Sign In & Verify IP' : 'Create Account & Authorize IP'}</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -607,7 +712,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                 {onSyncRegimen && onRestoreRegimen && (
                   <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-900/60 space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-indigo-200">Cloud Regimen Storage</span>
+                      <span className="font-bold text-indigo-200">Encrypted Cloud Storage</span>
                       <span className="text-stone-400 text-[11px]">{localSupplementsCount} supplements local</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -723,7 +828,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowMailbox(false)}
-                    className="p-1 text-stone-400 hover:text-white rounded-lg"
+                    className="p-1 text-stone-400 hover:text-white rounded-lg cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -756,7 +861,6 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                           <div>Target IP: <span className="text-indigo-300 font-bold">{mail.ip}</span></div>
                         </div>
 
-                        {/* 1-Click Authorize button */}
                         <div className="flex items-center gap-2 pt-1">
                           <button
                             type="button"
@@ -786,7 +890,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowMailbox(false)}
-                    className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold"
+                    className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold cursor-pointer"
                   >
                     Close
                   </button>

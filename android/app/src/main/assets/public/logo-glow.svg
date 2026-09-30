@@ -1,44 +1,68 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
     <!-- Neon Glow Filter -->
-    <filter id="neonGlow" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="8" result="blur1"/>
-      <feGaussianBlur stdDeviation="18" result="blur2"/>
-      <feGaussianBlur stdDeviation="30" result="blur3"/>
-      <feMerge>
-        <feMergeNode in="blur3"/>
-        <feMergeNode in="blur2"/>
-        <feMergeNode in="blur1"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+    <filter id="neonGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="16" result="blur"/>
     </filter>
   </defs>
 
-  <!-- Capsule Body with transparent blending -->
+  <!-- Ambient Glow -->
   <rect 
-    x="176" 
-    y="86" 
-    width="160" 
-    height="340" 
-    rx="80" 
-    fill="#00fca8" 
-    fill-opacity="0.1"
+    x="184" 
+    y="104" 
+    width="144" 
+    height="304" 
+    rx="72" 
+    fill="none" 
     stroke="#00fca8" 
-    stroke-width="26" 
-    stroke-linecap="round"
-    stroke-linejoin="round"
+    stroke-width="32" 
+    opacity="0.45"
+    filter="url(#neonGlow)"
+  />
+  <line 
+    x1="184" 
+    y1="256" 
+    x2="328" 
+    y2="256" 
+    stroke="#00fca8" 
+    stroke-width="32" 
+    opacity="0.45"
     filter="url(#neonGlow)"
   />
 
-  <!-- Center divider line -->
+  <!-- Crisp Capsule Body -->
+  <rect 
+    x="184" 
+    y="104" 
+    width="144" 
+    height="304" 
+    rx="72" 
+    fill="#00fca8" 
+    fill-opacity="0.08"
+    stroke="#00fca8" 
+    stroke-width="22" 
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Crisp Middle Divider Line -->
   <line 
-    x1="176" 
+    x1="184" 
     y1="256" 
-    x2="336" 
+    x2="328" 
     y2="256" 
     stroke="#00fca8" 
-    stroke-width="26" 
+    stroke-width="22" 
     stroke-linecap="round"
-    filter="url(#neonGlow)"
+  />
+  
+  <line 
+    x1="196" 
+    y1="256" 
+    x2="316" 
+    y2="256" 
+    stroke="#a3ffe0" 
+    stroke-width="7" 
+    stroke-linecap="round"
   />
 </svg>

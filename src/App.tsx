@@ -715,6 +715,51 @@ export default function App() {
       if (target) {
         handleTakeDose(target, action.doseLog.amountTaken, action.doseLog.notes);
       }
+    } else if (action.type === 'apply_protocol_bundle' && (action as any).protocolBundle) {
+      const bundle = (action as any).protocolBundle;
+      const todayStr = formatDateToYYYYMMDD(new Date());
+      const newItems: Supplement[] = (bundle.supplements || []).map((supp: any, idx: number) => {
+        const dType = supp.duration?.type || 'infinity';
+        return {
+          id: `supp_ai_${Date.now()}_${idx}`,
+          profileId: activeProfileId,
+          name: supp.name || 'Supplement',
+          doseAmount: Number(supp.doseAmount) || 1,
+          unit: supp.unit || 'mg',
+          form: supp.form || 'capsule',
+          category: supp.category || 'general',
+          colorTag: supp.colorTag || 'emerald',
+          frequencyType: supp.frequencyType || 'daily',
+          selectedDays: supp.selectedDays || [1, 2, 3, 4, 5],
+          intervalDays: supp.intervalDays,
+          doseTime: supp.doseTime || '09:00',
+          foodTiming: supp.foodTiming || 'with_food',
+          cycleConfig: supp.cycleConfig,
+          inventory: {
+            trackStock: true,
+            currentStock: 30,
+            bottleSize: 60,
+            unit: supp.unit === 'capsules' ? 'capsules' : 'doses',
+            lowStockThreshold: 7,
+            lastRestockedDate: todayStr,
+          },
+          expiryDate: supp.expiryDate,
+          duration: {
+            type: dType,
+            startDate: todayStr,
+            periodValue: dType === 'fixed' ? (supp.duration?.periodValue || 3) : undefined,
+            periodUnit: dType === 'fixed' ? (supp.duration?.periodUnit || 'months') : undefined,
+          },
+          notes: supp.notes || `Formulated for ${bundle.protocolName}`,
+          createdAt: new Date().toISOString(),
+        };
+      });
+
+      const updated = [...newItems, ...supplements];
+      setSupplements(updated);
+      saveSupplements(updated);
+      setToastMessage(`⚡ Dr. Maya: Applied ${bundle.protocolName} (+${newItems.length} supplements)`);
+      setTimeout(() => setToastMessage(null), 4500);
     }
   };
 
@@ -742,7 +787,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 flex flex-col font-sans transition-colors duration-200 w-full max-w-full overflow-x-hidden">
       
       {/* Top Bar Header */}
       <Header

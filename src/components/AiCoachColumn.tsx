@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, ArrowRight, ShieldCheck, Repeat, Infinity as InfinityIcon, Utensils, MessageSquare } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, Repeat, Infinity as InfinityIcon, Utensils, MessageSquare, Zap } from 'lucide-react';
 
 interface AiCoachColumnProps {
   onOpenChat: (initialPrompt?: string, specialMode?: boolean) => void;
@@ -23,32 +23,32 @@ export const AiCoachColumn: React.FC<AiCoachColumnProps> = ({
 
   const quickProtocols = [
     {
-      label: 'Boron 2w ON / 1w OFF',
-      desc: 'Cyclic Protocol',
-      icon: Repeat,
-      prompt: 'Boron 6 mg: take every day for 2 weeks, then break for 1 week, repeat for life',
+      label: 'Deep Sleep & Cortisol',
+      desc: 'Original Sleep Protocol',
+      icon: Sparkles,
+      prompt: 'Formulate an original clinical protocol for deep Slow-Wave Sleep and evening cortisol reduction.',
       isSpecial: true,
     },
     {
-      label: 'Vitamin D3 For Life (∞)',
-      desc: 'Infinity Regimen',
-      icon: InfinityIcon,
-      prompt: 'Vitamin D3 60,000 IU weekly for life (Infinity - never stop)',
+      label: 'Dopamine & Focus',
+      desc: 'Cognitive Protocol',
+      icon: Zap,
+      prompt: 'Formulate an original clinical protocol for sustained executive focus, dopamine support, and mental clarity.',
       isSpecial: true,
     },
     {
-      label: 'Check Interactions',
-      desc: 'Safety Audit',
+      label: 'Audit Stack Synergies',
+      desc: 'Biochemical Safety Audit',
       icon: ShieldCheck,
-      prompt: 'Review all my registered supplements for potential absorption competition or timing conflicts.',
+      prompt: 'Review all my registered supplements for biochemical synergies, absorption competition, and circadian timing conflicts.',
       isSpecial: false,
     },
     {
-      label: 'Optimal Timing',
-      desc: 'Food vs Fasted',
-      icon: Utensils,
-      prompt: 'Which of my supplements should be taken with meals containing fats vs on an empty stomach?',
-      isSpecial: false,
+      label: 'Pulsed Boron Cycling',
+      desc: '2w ON / 1w OFF Regimen',
+      icon: Repeat,
+      prompt: 'Formulate an original cyclic protocol: Boron 6mg take every day for 2 weeks, then break for 1 week, repeat for life.',
+      isSpecial: true,
     },
   ];
 
@@ -87,8 +87,8 @@ export const AiCoachColumn: React.FC<AiCoachColumnProps> = ({
       </div>
 
       {/* Interactive Quick Input */}
-      <form onSubmit={handleAsk} className="mt-4 flex items-center gap-2">
-        <div className="relative flex-1">
+      <form onSubmit={handleAsk} className="mt-4 flex items-center gap-2 w-full">
+        <div className="relative flex-1 min-w-0">
           <input
             type="text"
             value={quickQuestion}

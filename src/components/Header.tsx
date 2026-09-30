@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  Pill, 
   Sun, 
   Moon, 
   ChevronDown, 
@@ -11,6 +10,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, ProfileType } from '../types/profile';
 import { DiscordAuthUser } from '../utils/discordAuthClient';
+import { CapsuleLogo } from './CapsuleLogo';
 
 interface HeaderProps {
   activeTab: 'today' | 'supplements' | 'trends' | 'history';
@@ -44,115 +44,73 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/85 dark:bg-stone-900/85 backdrop-blur-md border-b border-stone-200/80 dark:border-stone-800 transition-colors">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
+    <header className="sticky top-0 z-40 bg-white/95 dark:bg-stone-950/95 backdrop-blur-md border-b border-stone-200/80 dark:border-stone-900 transition-colors w-full max-w-full overflow-x-hidden">
+      {/* Row 1: Top Bar with Branding, Profile Switcher & Actions */}
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-1.5 sm:gap-2">
         
-        {/* Zone 1: Branding & Profile Switcher */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-            <Pill className="w-5 h-5 rotate-45" />
-          </div>
-
-          <div className="hidden xs:block">
-            <span className="font-display font-black text-base tracking-tight text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
-              <span>Supple Pulse</span>
-            </span>
+        {/* Left: Branding & Profile Switcher */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Vertical Upright Capsule Logo with Prominent Middle Line */}
+          <div 
+            title="Supple Pulse" 
+            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-xs"
+          >
+            <CapsuleLogo className="w-full h-full" />
           </div>
 
           {/* Active Profile Badge / Quick Switcher */}
           <button
             onClick={onOpenProfileSwitcher}
             title="Switch Family Profile"
-            className="flex items-center gap-1.5 py-1 px-2.5 rounded-xl border border-stone-200/90 dark:border-stone-700/80 bg-stone-50/80 dark:bg-stone-800/80 hover:bg-stone-100 dark:hover:bg-stone-700/80 transition text-stone-800 dark:text-stone-200 text-xs font-semibold shadow-2xs cursor-pointer ml-1"
+            className="flex items-center gap-1 py-1 px-1.5 sm:px-2 rounded-xl border border-stone-200/90 dark:border-stone-800/80 bg-stone-100/80 dark:bg-stone-900/60 hover:bg-stone-200/70 dark:hover:bg-stone-800/80 transition text-stone-800 dark:text-stone-200 text-xs font-semibold shadow-2xs cursor-pointer shrink-0"
           >
-            <span className="w-5 h-5 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shrink-0">
+            <span className="w-6 h-6 rounded-full bg-emerald-700/90 text-white flex items-center justify-center shrink-0">
               {getProfileIcon(activeProfile.avatar, activeProfile.type)}
             </span>
-            <span className="max-w-[75px] sm:max-w-[105px] truncate font-bold text-stone-900 dark:text-white">
+            <span className="hidden sm:inline max-w-[110px] truncate font-bold text-stone-900 dark:text-white">
               {activeProfile.name}
             </span>
-            <ChevronDown className="w-3 h-3 text-stone-400" />
+            <ChevronDown className="w-3 h-3 text-stone-400 shrink-0" />
           </button>
         </div>
 
-        {/* Zone 2: Navigation Pills */}
-        <nav className="flex items-center gap-1 p-1 bg-stone-100/90 dark:bg-stone-800/80 rounded-2xl border border-stone-200/60 dark:border-stone-700/60">
-          <button
-            onClick={() => setActiveTab('today')}
-            className={`px-3 sm:px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all relative ${
-              activeTab === 'today'
-                ? 'bg-stone-950 text-white shadow-sm ring-1 ring-stone-900 dark:bg-black dark:ring-stone-600'
-                : 'bg-white text-stone-900 border border-stone-200/90 dark:bg-stone-800 dark:text-stone-200 dark:border-stone-700 hover:bg-stone-50 font-medium'
-            }`}
-          >
-            <span>Today</span>
-            {todayDueCount > 0 && (
-              <span className={`ml-1.5 text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                activeTab === 'today'
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-300'
-              }`}>
-                {todayDueCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('supplements')}
-            className={`px-3 sm:px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all ${
-              activeTab === 'supplements'
-                ? 'bg-stone-950 text-white shadow-sm ring-1 ring-stone-900 dark:bg-black dark:ring-stone-600'
-                : 'bg-white text-stone-900 border border-stone-200/90 dark:bg-stone-800 dark:text-stone-200 dark:border-stone-700 hover:bg-stone-50 font-medium'
-            }`}
-          >
-            Stash
-          </button>
-
-          <button
-            onClick={() => setActiveTab('trends')}
-            className={`px-3 sm:px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all ${
-              activeTab === 'trends'
-                ? 'bg-stone-950 text-white shadow-sm ring-1 ring-stone-900 dark:bg-black dark:ring-stone-600'
-                : 'bg-white text-stone-900 border border-stone-200/90 dark:bg-stone-800 dark:text-stone-200 dark:border-stone-700 hover:bg-stone-50 font-medium'
-            }`}
-          >
-            Trends
-          </button>
-
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-3 sm:px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all ${
-              activeTab === 'history'
-                ? 'bg-stone-950 text-white shadow-sm ring-1 ring-stone-900 dark:bg-black dark:ring-stone-600'
-                : 'bg-white text-stone-900 border border-stone-200/90 dark:bg-stone-800 dark:text-stone-200 dark:border-stone-700 hover:bg-stone-50 font-medium'
-            }`}
-          >
-            History
-          </button>
-        </nav>
-
-        {/* Zone 3: Security & Account Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Right: Security, Android App & Theme Actions */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           
           {/* Discord-Style Security Account Button */}
           {onOpenDiscordSecurity && (
             <button
               onClick={onOpenDiscordSecurity}
-              title={discordUser ? `IP Verified Account: ${discordUser.email}` : 'Sign In / Account Security (Discord-Style IP Guard)'}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition shadow-2xs cursor-pointer ${
+              title={discordUser ? `IP Verified Account: ${discordUser.email}` : 'Sign In / Account Security'}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-2xl border transition shadow-xs cursor-pointer shrink-0 ${
                 discordUser
                   ? 'bg-indigo-50 text-indigo-900 border-indigo-200/90 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800'
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white border-transparent'
+                  : 'bg-[#5865F2] hover:bg-[#4752C4] text-white border-indigo-400/30'
               }`}
             >
-              <Shield className={`w-3.5 h-3.5 ${discordUser ? 'text-indigo-600 dark:text-indigo-400' : 'text-white'}`} />
+              <Shield className={`w-3.5 h-3.5 ${discordUser ? 'text-indigo-600 dark:text-indigo-400' : 'text-white'} shrink-0`} />
               {discordUser ? (
-                <span className="hidden sm:inline text-[11px] truncate max-w-[120px]">
+                <span className="text-[11px] truncate max-w-[80px] sm:max-w-[130px] font-bold">
                   {discordUser.displayName || discordUser.email.split('@')[0]}
                 </span>
               ) : (
-                <span>Account</span>
+                <div className="flex flex-col text-left leading-none py-0.5">
+                  <span className="text-[9px] sm:text-[10px] font-medium opacity-90 leading-tight">Security</span>
+                  <span className="text-[11px] font-bold leading-tight">Sign-In</span>
+                </div>
               )}
+            </button>
+          )}
+
+          {/* Android APK & Mobile Application Hub Icon Button */}
+          {onOpenAndroidInstall && (
+            <button
+              type="button"
+              onClick={onOpenAndroidInstall}
+              title="Android Mobile App Hub"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-950/80 border border-emerald-800/80 text-emerald-400 flex items-center justify-center font-bold text-xs hover:bg-emerald-900 transition-colors shadow-2xs cursor-pointer shrink-0"
+            >
+              c
             </button>
           )}
 
@@ -162,12 +120,64 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={onToggleTheme}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-              className="p-2 rounded-xl text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-stone-200/80 dark:border-stone-800/80 bg-stone-100 dark:bg-stone-900/60 text-amber-500 hover:text-amber-400 flex items-center justify-center transition-colors cursor-pointer shrink-0"
             >
-              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+              {theme === 'dark' ? <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" /> : <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-stone-600" />}
             </button>
           )}
         </div>
+      </div>
+
+      {/* Row 2: Dedicated Navigation Tabs (Full Width - Today, Stash, Trends, History) */}
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 pb-2.5 pt-0.5 w-full">
+        <nav className="grid grid-cols-4 gap-1.5 sm:gap-2 w-full">
+          <button
+            onClick={() => setActiveTab('today')}
+            className={`py-1.5 px-1 sm:px-2 text-xs sm:text-sm font-semibold rounded-full transition-all text-center flex items-center justify-center gap-1 cursor-pointer truncate ${
+              activeTab === 'today'
+                ? 'bg-stone-900 dark:bg-stone-800 text-white border border-stone-800 dark:border-stone-600 shadow-xs font-bold'
+                : 'bg-stone-100/90 dark:bg-stone-900/60 text-stone-600 dark:text-stone-400 border border-stone-200/80 dark:border-stone-800/70 hover:bg-stone-200 dark:hover:bg-stone-800 font-medium'
+            }`}
+          >
+            <span className="truncate">Today</span>
+            {todayDueCount > 0 ? (
+              <span className="shrink-0 text-[11px] sm:text-xs">({todayDueCount})</span>
+            ) : null}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('supplements')}
+            className={`py-1.5 px-1 sm:px-2 text-xs sm:text-sm font-semibold rounded-full transition-all text-center flex items-center justify-center cursor-pointer truncate ${
+              activeTab === 'supplements'
+                ? 'bg-stone-900 dark:bg-stone-800 text-white border border-stone-800 dark:border-stone-600 shadow-xs font-bold'
+                : 'bg-stone-100/90 dark:bg-stone-900/60 text-stone-600 dark:text-stone-400 border border-stone-200/80 dark:border-stone-800/70 hover:bg-stone-200 dark:hover:bg-stone-800 font-medium'
+            }`}
+          >
+            <span className="truncate">Stash</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('trends')}
+            className={`py-1.5 px-1 sm:px-2 text-xs sm:text-sm font-semibold rounded-full transition-all text-center flex items-center justify-center cursor-pointer truncate ${
+              activeTab === 'trends'
+                ? 'bg-stone-900 dark:bg-stone-800 text-white border border-stone-800 dark:border-stone-600 shadow-xs font-bold'
+                : 'bg-stone-100/90 dark:bg-stone-900/60 text-stone-600 dark:text-stone-400 border border-stone-200/80 dark:border-stone-800/70 hover:bg-stone-200 dark:hover:bg-stone-800 font-medium'
+            }`}
+          >
+            <span className="truncate">Trends</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`py-1.5 px-1 sm:px-2 text-xs sm:text-sm font-semibold rounded-full transition-all text-center flex items-center justify-center cursor-pointer truncate ${
+              activeTab === 'history'
+                ? 'bg-stone-900 dark:bg-stone-800 text-white border border-stone-800 dark:border-stone-600 shadow-xs font-bold'
+                : 'bg-stone-100/90 dark:bg-stone-900/60 text-stone-600 dark:text-stone-400 border border-stone-200/80 dark:border-stone-800/70 hover:bg-stone-200 dark:hover:bg-stone-800 font-medium'
+            }`}
+          >
+            <span className="truncate">History</span>
+          </button>
+        </nav>
       </div>
     </header>
   );

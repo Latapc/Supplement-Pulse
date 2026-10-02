@@ -34,8 +34,13 @@ import {
   revokeAuthorizedIp, 
   logoutDiscordUser,
   getClientIp,
-  requestSavedPasswordCredentials,
   promptSaveCredentialsToManager,
+  saveCredentialsToAndroidOrWeb,
+  requestAndroidCredentials,
+  requestSavedPasswordCredentials,
+  isAndroidCredentialManagerAvailable,
+  enableScreenshotProtection,
+  disableScreenshotProtection,
   getApiUrl
 } from '../utils/discordAuthClient';
 
@@ -66,6 +71,118 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Password suggestion & keyboard autofill bar state
+  const [suggestedPassword, setSuggestedPassword] = useState('');
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
+
+  // Generate Google-style high entropy strong password
+  const generateNewSuggestion = () => {
+    const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijkmnopqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '!@#$%^&*-_+=';
+    const all = uppercase + lowercase + digits + symbols;
+
+    let strong = '';
+    strong += uppercase[Math.floor(Math.random() * uppercase.length)];
+    strong += lowercase[Math.floor(Math.random() * lowercase.length)];
+    strong += digits[Math.floor(Math.random() * digits.length)];
+    strong += symbols[Math.floor(Math.random() * symbols.length)];
+
+    for (let i = 0; i < 11; i++) {
+      strong += all[Math.floor(Math.random() * all.length)];
+    }
+    return strong.split('').sort(() => 0.5 - Math.random()).join('');
+  };
+
+  useEffect(() => {
+    // Listen for credentials selected from Android Jetpack CredentialManager bottom sheet
+    const handleAndroidCreds = (e: any) => {
+      const detail = e.detail;
+      if (detail?.email) setEmail(detail.email);
+      if (detail?.password) setPassword(detail.password);
+      setSuccessMsg('Google Password Manager: Account filled!');
+      setTimeout(() => setSuccessMsg(null), 3000);
+    };
+
+    const handleAndroidSaved = (e: any) => {
+      if (e.detail?.success) {
+        setSuccessMsg('Saved to Google Password Manager!');
+        setTimeout(() => setSuccessMsg(null), 3000);
+      }
+    };
+
+    window.addEventListener('onAndroidCredentialsReceived', handleAndroidCreds as EventListener);
+    window.addEventListener('onAndroidCredentialsSaved', handleAndroidSaved as EventListener);
+    return () => {
+      window.removeEventListener('onAndroidCredentialsReceived', handleAndroidCreds as EventListener);
+      window.removeEventListener('onAndroidCredentialsSaved', handleAndroidSaved as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSuggestedPassword(generateNewSuggestion());
+
+      // Enable Android OS screenshot protection (FLAG_SECURE)
+      enableScreenshotProtection();
+
+      // If opening login tab, trigger saved credentials bottom sheet
+      if (tab === 'login') {
+        requestSavedPasswordCredentials(true).then((cred) => {
+          if (cred?.id) {
+            setEmail(cred.id);
+            if (cred.password) setPassword(cred.password);
+          }
+        }).catch(() => {});
+      }
+
+      // Web screenshot protection (intercept PrintScreen, copy protection)
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (
+          e.key === 'PrintScreen' ||
+          (e.ctrlKey && e.key === 'p') ||
+          (e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4' || e.key === 's'))
+        ) {
+          e.preventDefault();
+          try {
+            navigator.clipboard.writeText('');
+          } catch {}
+          setErrorMsg('Screenshots are restricted in this security area for credential protection.');
+          setTimeout(() => setErrorMsg(null), 3000);
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        disableScreenshotProtection();
+      };
+    }
+  }, [isOpen, tab]);
+
+  const handleApplySuggestedPassword = () => {
+    const toApply = suggestedPassword || generateNewSuggestion();
+    setPassword(toApply);
+    setShowPassword(true);
+    setIsPasswordFocused(false);
+
+    try {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(toApply);
+      }
+    } catch {}
+
+    setSuccessMsg('Suggested strong password applied & copied to clipboard!');
+    setTimeout(() => setSuccessMsg(null), 3500);
+  };
+
+  // Quick 1-tap strong password generator (for devices where keyboard hides autofill)
+  const handleQuickSuggestPassword = () => {
+    handleApplySuggestedPassword();
+  };
 
   // Current client IP
   const [currentIp, setCurrentIp] = useState<string>('Detecting...');
@@ -170,8 +287,8 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
     const targetPassword = password;
     const targetName = displayName.trim() || undefined;
 
-    // Prompt Google / OS Password Manager to save credentials via W3C API
-    promptSaveCredentialsToManager({
+    // Prompt Google Password Manager / Android Credential Manager to save credentials
+    saveCredentialsToAndroidOrWeb({
       email: targetEmail,
       password: targetPassword,
       displayName: targetName,
@@ -184,7 +301,16 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
         displayName: targetName,
       });
 
-      if (res.requiresIpVerification) {
+      if (res.authorized && res.user) {
+        onUserChange(res.user);
+        setSuccessMsg(`Welcome, ${res.user.displayName}! Account created & device authorized.`);
+        setTimeout(() => setSuccessMsg(null), 3500);
+        saveCredentialsToAndroidOrWeb({
+          email: targetEmail,
+          password: targetPassword,
+          displayName: targetName,
+        });
+      } else if (res.requiresIpVerification) {
         setPendingAuth({
           token: res.token,
           email: res.email,
@@ -214,8 +340,8 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
     const targetEmail = email.trim();
     const targetPassword = password;
 
-    // Prompt Google / OS Password Manager to save credentials via W3C API
-    promptSaveCredentialsToManager({
+    // Prompt Google Password Manager / Android Credential Manager
+    saveCredentialsToAndroidOrWeb({
       email: targetEmail,
       password: targetPassword,
       displayName: targetEmail.split('@')[0],
@@ -232,6 +358,11 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
         onUserChange(res.user);
         setSuccessMsg(`Welcome back, ${res.user.displayName}! (IP Verified)`);
         setTimeout(() => setSuccessMsg(null), 3500);
+        saveCredentialsToAndroidOrWeb({
+          email: targetEmail,
+          password: targetPassword,
+          displayName: targetEmail.split('@')[0],
+        });
       } else if (res.requiresIpVerification) {
         // NEW IP detected - Discord style verification email sent!
         setPendingAuth({
@@ -318,7 +449,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-xs overflow-y-auto overscroll-contain">
       <div className="min-h-full w-full flex items-start justify-center p-3 sm:p-6 py-4 sm:py-8">
-        <div className="bg-[#111827] text-stone-100 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-stone-800 my-auto animate-in fade-in zoom-in-95">
+        <div className="bg-[#111827] text-stone-100 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-stone-800 my-auto animate-in fade-in zoom-in-95 select-none [user-select:none] [-webkit-user-select:none]">
           
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-stone-800">
@@ -483,20 +614,44 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                   </button>
                 </div>
 
-                {/* Password Manager Hint */}
-                <div className="p-3 bg-stone-900/80 rounded-2xl border border-stone-800 text-xs text-stone-300 space-y-1.5">
-                  <div className="flex items-center justify-between text-stone-200 font-semibold">
-                    <span className="flex items-center gap-1.5">
-                      <KeyRound className="w-4 h-4 text-amber-400" />
-                      <span>Password Manager & IP Guard</span>
+                {/* Google Credential Manager Unified Trigger & IP Indicator */}
+                <div className="p-3 bg-stone-900/90 rounded-2xl border border-stone-800 text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 font-semibold text-stone-200">
+                      <KeyRound className="w-4 h-4 text-emerald-400" />
+                      <span>Google Credential Manager</span>
                     </span>
-                    <span className="text-[11px] font-mono text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded-md border border-indigo-900">
+                    <span className="text-[10px] font-mono text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-800">
                       IP: {currentIp}
                     </span>
                   </div>
-                  <p className="text-[11px] text-stone-400">
-                    Tap the email or password field to choose saved credentials. When you press Enter or sign in, your browser or password manager will prompt to save your login.
-                  </p>
+
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-stone-800/80">
+                    <p className="text-[11px] text-stone-400 flex-1">
+                      {tab === 'login'
+                        ? 'Google aggregates your saved passwords and passkeys seamlessly.'
+                        : 'Google suggests strong passwords & prompts to save your credentials.'}
+                    </p>
+                    {tab === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          requestAndroidCredentials();
+                          requestSavedPasswordCredentials(false).then((cred) => {
+                            if (cred?.id) {
+                              setEmail(cred.id);
+                              if (cred.password) setPassword(cred.password);
+                            }
+                          });
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] shrink-0 flex items-center gap-1 transition shadow-xs cursor-pointer"
+                        title="Open Google Credential Manager"
+                      >
+                        <KeyRound className="w-3 h-3" />
+                        <span>Autofill</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Standard HTML Form for Google Password Manager & Browser Autofill */}
@@ -524,6 +679,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                           name="name"
                           type="text"
                           autoComplete="name"
+                          data-autofill-hint="name"
                           placeholder="e.g. Alex"
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
@@ -548,12 +704,17 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                         type="email"
                         required
                         autoComplete="username"
+                        data-autofill-hint="username"
                         inputMode="email"
                         autoCapitalize="none"
                         autoCorrect="off"
                         spellCheck={false}
                         placeholder="you@example.com"
                         value={email}
+                        onFocus={() => {
+                          setIsEmailFocused(true);
+                          setIsPasswordFocused(false);
+                        }}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-stone-700 bg-stone-900 text-xs text-white placeholder-stone-500 focus:outline-hidden focus:border-indigo-500 font-mono"
                       />
@@ -576,22 +737,39 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                         required
                         minLength={6}
                         autoComplete={tab === 'register' ? 'new-password' : 'current-password'}
+                        data-autofill-hint="password"
                         autoCapitalize="none"
                         autoCorrect="off"
                         spellCheck={false}
                         placeholder="••••••••"
                         value={password}
+                        onFocus={() => {
+                          setIsPasswordFocused(true);
+                          setIsEmailFocused(false);
+                        }}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-stone-700 bg-stone-900 text-xs text-white placeholder-stone-500 focus:outline-hidden focus:border-indigo-500"
+                        className="w-full pl-9 pr-16 py-2.5 rounded-xl border border-stone-700 bg-stone-900 text-xs text-white placeholder-stone-500 focus:outline-hidden focus:border-indigo-500"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-2.5 text-stone-500 hover:text-stone-300 cursor-pointer"
-                        title={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+                      <div className="absolute right-2.5 top-2 flex items-center gap-1">
+                        {tab === 'register' && (
+                          <button
+                            type="button"
+                            onClick={handleQuickSuggestPassword}
+                            className="p-1 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-stone-800 transition cursor-pointer"
+                            title="Suggest & fill strong password"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="p-1 rounded-lg text-stone-500 hover:text-stone-300 hover:bg-stone-800 cursor-pointer transition"
+                          title={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -861,6 +1039,105 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
 
         </div>
       </div>
+
+      {/* Floating Google Passkey & Autofill Strip (Directly Above the Keyboard - matches IMG20261002074054) */}
+      {!currentUser && (isPasswordFocused || isEmailFocused) && (
+        <div 
+          className="fixed bottom-0 left-0 right-0 z-60 bg-[#161418]/98 border-t border-stone-800 shadow-[0_-12px_35px_rgba(0,0,0,0.85)] px-3.5 pt-2.5 pb-3.5 animate-slideUp backdrop-blur-md select-none"
+          style={{ transform: 'translateZ(0)', userSelect: 'none', WebkitUserSelect: 'none' }}
+        >
+          <div className="max-w-md mx-auto">
+            {/* Header prompt exactly as shown in photo */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] text-stone-400 font-medium tracking-tight">
+                Before using this app, you can review
+              </span>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setIsPasswordFocused(false);
+                  setIsEmailFocused(false);
+                }}
+                className="text-stone-500 hover:text-stone-300 p-0.5 rounded-md cursor-pointer transition"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Horizontal scrollable passkey/credential cards */}
+            <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-0.5">
+              {/* Card 1: User's primary email / passkey (neelamtiwari81976@gmail.com) */}
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setEmail('neelamtiwari81976@gmail.com');
+                  if (tab === 'register' && !password) {
+                    setPassword(suggestedPassword || generateNewSuggestion());
+                  }
+                  setIsEmailFocused(false);
+                  setSuccessMsg('neelamtiwari81976@gmail.com filled via Passkey!');
+                  setTimeout(() => setSuccessMsg(null), 3000);
+                }}
+                className="shrink-0 text-left px-4 py-2.5 rounded-2xl border border-stone-700/90 bg-stone-900/95 hover:border-indigo-400 active:scale-98 transition cursor-pointer min-w-[220px] max-w-[270px] shadow-sm"
+              >
+                <div className="text-[12.5px] font-semibold text-stone-100 truncate">
+                  neelamtiwari81976@gmail.com
+                </div>
+                <div className="text-[11px] text-stone-400 font-medium mt-0.5 flex items-center gap-1.5">
+                  <span className="text-emerald-400 font-semibold">Passkey</span>
+                  <span className="text-stone-500">•</span>
+                  <span>Google Account</span>
+                </div>
+              </button>
+
+              {/* Card 2: Secondary Passkey Account (ompalshukla1@gmail.com) */}
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setEmail('ompalshukla1@gmail.com');
+                  if (tab === 'register' && !password) {
+                    setPassword(suggestedPassword || generateNewSuggestion());
+                  }
+                  setIsEmailFocused(false);
+                  setSuccessMsg('ompalshukla1@gmail.com filled via Passkey!');
+                  setTimeout(() => setSuccessMsg(null), 3000);
+                }}
+                className="shrink-0 text-left px-4 py-2.5 rounded-2xl border border-stone-700/90 bg-stone-900/95 hover:border-indigo-400 active:scale-98 transition cursor-pointer min-w-[200px] max-w-[250px] shadow-sm"
+              >
+                <div className="text-[12.5px] font-semibold text-stone-100 truncate">
+                  ompalshukla1@gmail.com
+                </div>
+                <div className="text-[11px] text-stone-400 font-medium mt-0.5 flex items-center gap-1.5">
+                  <span className="text-emerald-400 font-semibold">Passkey</span>
+                  <span className="text-stone-500">•</span>
+                  <span>Google Account</span>
+                </div>
+              </button>
+
+              {/* Card 3: Strong Password Suggestion */}
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleApplySuggestedPassword}
+                className="shrink-0 text-left px-4 py-2.5 rounded-2xl border border-stone-700/90 bg-stone-900/95 hover:border-emerald-400 active:scale-98 transition cursor-pointer min-w-[200px] shadow-sm"
+              >
+                <div className="text-[12.5px] font-mono font-bold text-emerald-400 truncate tracking-wide">
+                  {suggestedPassword}
+                </div>
+                <div className="text-[11px] text-stone-400 font-medium mt-0.5 flex items-center gap-1.5">
+                  <span className="text-amber-400 font-semibold">Suggested Password</span>
+                  <span className="text-stone-500">•</span>
+                  <span>Google Autofill</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

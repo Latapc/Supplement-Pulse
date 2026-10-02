@@ -41,8 +41,18 @@ export interface SecurityEmailLog {
   token: string;
 }
 
-const USERS_DB_FILE = path.join(process.cwd(), 'data', 'users_auth_db.json');
-const EMAILS_LOG_FILE = path.join(process.cwd(), 'data', 'security_emails.json');
+const DATA_DIR = path.join(process.cwd(), 'data');
+const USERS_DB_FILE = path.join(DATA_DIR, 'users_auth_db.json');
+const EMAILS_LOG_FILE = path.join(DATA_DIR, 'security_emails.json');
+
+// Ensure storage directory exists
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.warn('Could not initialize data directory:', e);
+}
 
 // Memory caches
 const usersMap = new Map<string, UserAccount>(); // key: lowercase email
@@ -74,6 +84,9 @@ try {
 
 function persistUsersDb() {
   try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
     const obj: Record<string, UserAccount> = {};
     usersMap.forEach((u, k) => {
       obj[k] = u;
@@ -86,6 +99,9 @@ function persistUsersDb() {
 
 function persistEmailLogs() {
   try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
     fs.writeFileSync(EMAILS_LOG_FILE, JSON.stringify(emailLogs.slice(-50), null, 2), 'utf-8');
   } catch (err) {
     console.error('Failed to persist security_emails.json:', err);
@@ -284,11 +300,11 @@ export function createDiscordAuthRouter(): express.Router {
         passwordHash,
         salt,
         displayName: displayName?.trim() || normalizedEmail.split('@')[0],
-        isEmailVerified: false,
+        isEmailVerified: true,
         createdAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
         lastLoginIp: clientIp,
-        authorizedIps: [], // Must be authorized via email link!
+        authorizedIps: [clientIp], // Creating device is immediately authorized!
       };
 
       usersMap.set(normalizedEmail, newUser);
@@ -307,12 +323,12 @@ export function createDiscordAuthRouter(): express.Router {
         type: 'registration_verify',
         createdAt: new Date().toISOString(),
         expiresAt,
-        authorized: false,
+        authorized: true,
       };
 
       pendingTokensMap.set(token, pendingAuth);
 
-      // Send verification email
+      // Send verification & welcome email to security log
       const baseUrl = getBaseUrl(req);
       const emailLog = await sendSecurityEmail({
         to: normalizedEmail,
@@ -325,13 +341,21 @@ export function createDiscordAuthRouter(): express.Router {
 
       return res.json({
         success: true,
-        requiresIpVerification: true,
+        authorized: true,
+        requiresIpVerification: false,
         type: 'registration_verify',
         email: normalizedEmail,
         ip: clientIp,
         token,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          displayName: newUser.displayName,
+          authorizedIps: newUser.authorizedIps,
+          currentIp: clientIp,
+        },
         verificationLink: emailLog.verificationLink,
-        message: 'Account created! Please check your email to authorize your IP address.',
+        message: 'Account created and device authorized! Welcome to Supple Pulse.',
       });
     } catch (err: any) {
       console.error('Registration error:', err);

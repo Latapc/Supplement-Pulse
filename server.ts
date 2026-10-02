@@ -629,8 +629,18 @@ What physiological objective would you like me to reason through today?`,
 }
 
 // File-backed user cloud backup storage for multi-user isolation
-const SYNC_DB_FILE = path.join(process.cwd(), 'data', 'user_sync_db.json');
+const DATA_DIR = path.join(process.cwd(), 'data');
+const SYNC_DB_FILE = path.join(DATA_DIR, 'user_sync_db.json');
 const userCloudStores = new Map<string, any>();
+
+// Ensure directory exists
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.warn('Could not initialize data directory in server.ts:', e);
+}
 
 // Load existing synced accounts on startup
 try {
@@ -645,6 +655,9 @@ try {
 
 function persistSyncDb() {
   try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
     const obj: Record<string, any> = {};
     userCloudStores.forEach((v, k) => {
       obj[k] = v;

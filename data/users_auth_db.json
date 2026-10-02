@@ -1,0 +1,16 @@
+{
+  "persisted_user@supplepulse.app": {
+    "id": "usr_9556467b3f71d70a",
+    "email": "persisted_user@supplepulse.app",
+    "passwordHash": "4f1b7a8c58bba4a9dc49b28500a51a0c4c6ba111147d646f657d55cf00d441f5c0e06b150c3f0094364a1bf8a1dc3de07e1890df72f1e79b69673846c5ace364",
+    "salt": "d91ef687f307631b6f1d5d4a5676a829",
+    "displayName": "Persisted User",
+    "isEmailVerified": true,
+    "createdAt": "2026-10-02T02:46:28.082Z",
+    "lastLoginAt": "2026-10-02T02:46:28.082Z",
+    "lastLoginIp": "127.0.0.1",
+    "authorizedIps": [
+      "127.0.0.1"
+    ]
+  }
+}

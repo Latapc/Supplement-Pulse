@@ -1,26 +1,33 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart2, 
   TrendingUp, 
   CheckCircle2, 
   Award, 
-  Activity,
-  Flame,
-  Filter,
-  Layers,
-  LineChart as LineChartIcon,
-  Percent,
-  CheckCircle,
-  AlertTriangle,
-  ChevronDown
+  Activity, 
+  Flame, 
+  Filter, 
+  Layers, 
+  LineChart as LineChartIcon, 
+  Percent, 
+  CheckCircle, 
+  AlertTriangle, 
+  ChevronDown,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { Supplement, DoseLog } from '../types/supplement';
 import { formatDateToYYYYMMDD, isScheduledOnDate } from '../utils/dates';
+import { SupplementCalendarView } from './SupplementCalendarView';
 
 interface TrendsAndGraphsProps {
   supplements: Supplement[];
   logs: DoseLog[];
   currentDate: Date;
+  initialSupplementId?: string;
+  initialViewMode?: 'calendar' | 'analytics';
+  onOpenEditModal?: (supplement: Supplement) => void;
+  onQuickLog?: (supplement: Supplement, amount?: number, notes?: string) => void;
+  onUpdateSupplement?: (supplement: Supplement) => void;
 }
 
 type AggregationPeriod = 'weekly' | 'monthly' | 'yearly' | 'daily';
@@ -30,12 +37,30 @@ export const TrendsAndGraphs: React.FC<TrendsAndGraphsProps> = ({
   supplements,
   logs,
   currentDate,
+  initialSupplementId = 'all',
+  initialViewMode = 'calendar',
+  onOpenEditModal,
+  onQuickLog,
+  onUpdateSupplement,
 }) => {
+  const [viewMode, setViewMode] = useState<'calendar' | 'analytics'>(initialViewMode);
   const [period, setPeriod] = useState<AggregationPeriod>('weekly');
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [dailyRangeDays, setDailyRangeDays] = useState<7 | 14 | 30>(14);
-  const [selectedSupplementId, setSelectedSupplementId] = useState<string>('all');
+  const [selectedSupplementId, setSelectedSupplementId] = useState<string>(initialSupplementId);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (initialSupplementId) {
+      setSelectedSupplementId(initialSupplementId);
+    }
+  }, [initialSupplementId]);
+
+  useEffect(() => {
+    if (initialViewMode) {
+      setViewMode(initialViewMode);
+    }
+  }, [initialViewMode]);
 
   const selectedSupplement = useMemo(() => {
     return supplements.find((s) => s.id === selectedSupplementId);
@@ -348,16 +373,70 @@ export const TrendsAndGraphs: React.FC<TrendsAndGraphsProps> = ({
   return (
     <div className="space-y-6">
       
-      {/* Top Filter & Aggregation Switcher Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-stone-200">
+      {/* View Mode Switcher: Calendar Schedule Matrix vs Analytics & Charts */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-900 font-display">
-            Consumption Analytics & Intake Trends
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-900 dark:text-white font-display">
+            {viewMode === 'calendar' ? 'Supplement Schedule & Google Calendar' : 'Consumption Analytics & Intake Trends'}
           </h2>
-          <p className="text-xs sm:text-sm text-stone-500">
-            Interactive multi-period charts (Daily, Weekly, Monthly, Yearly) with planned schedule adherence
+          <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400">
+            {viewMode === 'calendar'
+              ? 'View monthly intake schedule, verify scheduled intake days for Vitamin D3 & your stash, and sync with Google Calendar'
+              : 'Interactive multi-period adherence charts (Daily, Weekly, Monthly, Yearly) with planned schedule metrics'}
           </p>
         </div>
+
+        <div className="flex items-center p-1 bg-stone-100 dark:bg-stone-800 rounded-2xl border border-stone-200 dark:border-stone-700 w-fit shrink-0">
+          <button
+            type="button"
+            onClick={() => setViewMode('calendar')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer ${
+              viewMode === 'calendar'
+                ? 'bg-white dark:bg-stone-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
+            }`}
+          >
+            <CalendarIcon className="w-4 h-4 text-blue-500" />
+            <span>Calendar Schedule</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('analytics')}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer ${
+              viewMode === 'analytics'
+                ? 'bg-white dark:bg-stone-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
+            }`}
+          >
+            <BarChart2 className="w-4 h-4 text-emerald-500" />
+            <span>Adherence Charts</span>
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'calendar' ? (
+        <SupplementCalendarView
+          supplements={supplements}
+          logs={logs}
+          currentDate={currentDate}
+          initialSelectedSupplementId={selectedSupplementId}
+          onOpenEditModal={onOpenEditModal}
+          onQuickLog={onQuickLog}
+          onUpdateSupplement={onUpdateSupplement}
+        />
+      ) : (
+        <>
+          {/* Top Filter & Aggregation Switcher Bar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-stone-200">
+            <div>
+              <h3 className="text-base font-bold text-stone-900 dark:text-white">
+                Intake Fulfillment & Adherence Graphs
+              </h3>
+              <p className="text-xs text-stone-500">
+                Compare actual taken doses vs planned schedules over custom time horizons
+              </p>
+            </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {/* Chart Type Toggle: Bar Chart vs Line Graph */}
@@ -849,6 +928,8 @@ export const TrendsAndGraphs: React.FC<TrendsAndGraphsProps> = ({
           })}
         </div>
       </div>
+      </>
+      )}
 
     </div>
   );

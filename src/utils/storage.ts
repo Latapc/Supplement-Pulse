@@ -35,6 +35,9 @@ export function getInitialSupplements(): Supplement[] {
       colorTag: 'amber',
       frequencyType: 'weekly',
       selectedDays: [1], // Monday
+      doseTime: '08:30',
+      foodTiming: 'with_food',
+      syncToGoogleCalendar: true,
       duration: {
         type: 'infinity',
         startDate: dStartStr,

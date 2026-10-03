@@ -6,15 +6,18 @@ import {
   Heart, 
   Sparkles, 
   User, 
-  Shield
+  Shield,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { UserProfile, ProfileType } from '../types/profile';
 import { DiscordAuthUser } from '../utils/discordAuthClient';
 import { CapsuleLogo } from './CapsuleLogo';
 
+export type NavTab = 'today' | 'calendar' | 'supplements' | 'trends' | 'history';
+
 interface HeaderProps {
-  activeTab: 'today' | 'supplements' | 'trends' | 'history';
-  setActiveTab: (tab: 'today' | 'supplements' | 'trends' | 'history') => void;
+  activeTab: NavTab;
+  setActiveTab: (tab: NavTab) => void;
   onOpenProfileSwitcher: () => void;
   onOpenAndroidInstall: () => void;
   todayDueCount: number;
@@ -77,6 +80,21 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right: Security, Android App & Theme Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           
+          {/* Google Calendar Hub Quick Action Button */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('calendar')}
+            title="Google Calendar Hub - View Supplement Dosing Days"
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-2xl border transition shadow-xs cursor-pointer shrink-0 ${
+              activeTab === 'calendar'
+                ? 'bg-blue-600 text-white border-blue-500 shadow-xs'
+                : 'bg-blue-50/90 hover:bg-blue-100 text-blue-900 border-blue-200/90 dark:bg-blue-950/50 dark:text-blue-200 dark:border-blue-800'
+            }`}
+          >
+            <CalendarIcon className={`w-3.5 h-3.5 ${activeTab === 'calendar' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+            <span className="font-bold text-[11px] sm:text-xs">Calendar</span>
+          </button>
+
           {/* Discord-Style Security Account Button */}
           {onOpenDiscordSecurity && (
             <button
@@ -128,9 +146,9 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Row 2: Dedicated Navigation Tabs (Full Width - Today, Stash, Trends, History) */}
+      {/* Row 2: Dedicated Navigation Tabs (Full Width - Today, Calendar, Stash, Trends, History) */}
       <div className="max-w-5xl mx-auto px-3 sm:px-6 pb-2.5 pt-0.5 w-full">
-        <nav className="grid grid-cols-4 gap-1.5 sm:gap-2 w-full">
+        <nav className="grid grid-cols-5 gap-1 sm:gap-2 w-full">
           <button
             onClick={() => setActiveTab('today')}
             className={`py-1.5 px-1 sm:px-2 text-xs sm:text-sm font-semibold rounded-full transition-all text-center flex items-center justify-center gap-1 cursor-pointer truncate ${
@@ -141,8 +159,20 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <span className="truncate">Today</span>
             {todayDueCount > 0 ? (
-              <span className="shrink-0 text-[11px] sm:text-xs">({todayDueCount})</span>
+              <span className="shrink-0 text-[10px] sm:text-xs">({todayDueCount})</span>
             ) : null}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('calendar')}
+            className={`py-1.5 px-1 sm:px-2 text-xs sm:text-sm font-semibold rounded-full transition-all text-center flex items-center justify-center gap-1 cursor-pointer truncate ${
+              activeTab === 'calendar'
+                ? 'bg-blue-600 text-white border border-blue-500 shadow-xs font-bold'
+                : 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/70 hover:bg-blue-100 dark:hover:bg-blue-900/60 font-semibold'
+            }`}
+          >
+            <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Calendar</span>
           </button>
 
           <button

@@ -13,11 +13,12 @@ import {
   AlertTriangle,
   RefreshCw,
   Infinity as InfinityIcon,
-  Repeat
+  Repeat,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { Supplement, TodaySupplementStatus, DayOfWeek } from '../types/supplement';
 import { UserProfile } from '../types/profile';
-import { getDayName } from '../utils/dates';
+import { getDayName, getDayShortName } from '../utils/dates';
 
 interface SupplementCardProps {
   supplement: Supplement;
@@ -28,6 +29,8 @@ interface SupplementCardProps {
   onRenewCourse: (supplement: Supplement) => void;
   onQuickLog: (supplement: Supplement) => void;
   onRefillStock?: (supplementId: string) => void;
+  onViewInCalendar?: (supplement: Supplement) => void;
+  onSyncToCalendar?: (supplement: Supplement) => void;
 }
 
 export const SupplementCard: React.FC<SupplementCardProps> = ({
@@ -39,6 +42,8 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
   onRenewCourse,
   onQuickLog,
   onRefillStock,
+  onViewInCalendar,
+  onSyncToCalendar,
 }) => {
   const isExpired = status.isCourseExpired;
   const isFixedDuration = supplement.duration.type === 'fixed';
@@ -157,9 +162,68 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
 
         {/* Schedule details */}
         <div className="mt-4 space-y-2 text-xs text-stone-600 dark:text-stone-300">
-          <div className="flex items-center gap-2">
-            <Clock className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500 shrink-0" />
-            <span className="font-medium text-stone-800 dark:text-stone-200">{scheduleDescription}</span>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500 shrink-0" />
+              <span className="font-medium text-stone-800 dark:text-stone-200">
+                {scheduleDescription} · {supplement.doseTime || '09:00'}
+                {supplement.foodTiming && ` (${supplement.foodTiming.replace(/_/g, ' ')})`}
+              </span>
+            </div>
+
+            {/* Google Calendar Sync Badge */}
+            {supplement.syncToGoogleCalendar ? (
+              <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 flex items-center gap-1">
+                <CalendarIcon className="w-3 h-3 text-blue-500" />
+                <span>G-Cal Synced</span>
+              </span>
+            ) : onSyncToCalendar ? (
+              <button
+                type="button"
+                onClick={() => onSyncToCalendar(supplement)}
+                className="text-[10px] font-bold text-stone-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 cursor-pointer"
+              >
+                <CalendarIcon className="w-3 h-3" />
+                <span>Sync to G-Cal</span>
+              </button>
+            ) : null}
+          </div>
+
+          {/* Weekday Intake Badges (shows on which days of the week it's taken) */}
+          <div className="flex items-center justify-between pt-1 pb-0.5">
+            <div className="flex items-center gap-1">
+              {[0, 1, 2, 3, 4, 5, 6].map((dayIdx) => {
+                const isDaily = supplement.frequencyType === 'daily';
+                const isWeeklyScheduled = supplement.frequencyType === 'weekly' && (supplement.selectedDays || [1]).includes(dayIdx as DayOfWeek);
+                const isActiveDay = isDaily || isWeeklyScheduled;
+                return (
+                  <span
+                    key={dayIdx}
+                    className={`w-5 h-5 rounded-md text-[10px] font-bold flex items-center justify-center transition-all ${
+                      isActiveDay
+                        ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
+                        : 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-600'
+                    }`}
+                    title={`${getDayName(dayIdx as DayOfWeek)}: ${isActiveDay ? 'Scheduled intake day' : 'Rest / Not scheduled'}`}
+                  >
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'][dayIdx]}
+                  </span>
+                );
+              })}
+            </div>
+
+            {/* View in Calendar Action */}
+            {onViewInCalendar && (
+              <button
+                type="button"
+                onClick={() => onViewInCalendar(supplement)}
+                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 px-2 py-0.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/60 transition cursor-pointer"
+                title={`Open calendar view showing all scheduled days for ${supplement.name}`}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" />
+                <span>Calendar Days</span>
+              </button>
+            )}
           </div>
 
           {/* Cyclic Phase Banner if applicable */}

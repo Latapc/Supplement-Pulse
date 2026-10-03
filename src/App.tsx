@@ -44,6 +44,11 @@ import {
 } from './types/supplement';
 import { UserProfile, INITIAL_PROFILES } from './types/profile';
 import { 
+  syncSupplementToGoogleCalendar, 
+  deleteSupplementCalendarEvent, 
+  isGoogleCalendarConnected 
+} from './utils/googleCalendar';
+import { 
   loadSupplements, 
   saveSupplements, 
   loadDoseLogs, 
@@ -71,13 +76,17 @@ import {
   Plus, 
   CheckCircle2, 
   RotateCcw, 
-  Sparkles 
+  Sparkles,
+  Calendar as CalendarIcon
 } from 'lucide-react';
+import { SupplementCalendarView } from './components/SupplementCalendarView';
 
 export default function App() {
   const [supplements, setSupplements] = useState<Supplement[]>([]);
   const [logs, setLogs] = useState<DoseLog[]>([]);
-  const [activeTab, setActiveTab] = useState<'today' | 'supplements' | 'trends' | 'history'>('today');
+  const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'supplements' | 'trends' | 'history'>('today');
+  const [calendarSupplementId, setCalendarSupplementId] = useState<string>('all');
+  const [stashViewMode, setStashViewMode] = useState<'cards' | 'calendar'>('cards');
   
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -580,24 +589,78 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Save supplement (add or edit)
-  const handleSaveSupplement = (supplement: Supplement) => {
+  // Save supplement (add or edit) with automated Google Calendar event updates
+  const handleSaveSupplement = async (supplement: Supplement) => {
+    let finalSupplement = supplement;
+
+    // Automated Google Calendar sync if enabled and authenticated
+    if (supplement.syncToGoogleCalendar && isGoogleCalendarConnected()) {
+      try {
+        const calResult = await syncSupplementToGoogleCalendar(supplement);
+        finalSupplement = {
+          ...supplement,
+          googleCalendarEventId: calResult.eventId,
+          lastCalendarSyncAt: new Date().toISOString(),
+        };
+      } catch (err) {
+        console.warn('Could not auto-sync to Google Calendar on save:', err);
+      }
+    }
+
     let updated: Supplement[];
-    const exists = supplements.some((s) => s.id === supplement.id);
+    const exists = supplements.some((s) => s.id === finalSupplement.id);
     if (exists) {
-      updated = supplements.map((s) => (s.id === supplement.id ? supplement : s));
+      updated = supplements.map((s) => (s.id === finalSupplement.id ? finalSupplement : s));
     } else {
-      updated = [supplement, ...supplements];
+      updated = [finalSupplement, ...supplements];
     }
     setSupplements(updated);
     saveSupplements(updated);
-    setToastMessage(`Saved ${supplement.name}`);
-    setTimeout(() => setToastMessage(null), 3000);
+    setToastMessage(`Saved ${finalSupplement.name}${finalSupplement.googleCalendarEventId ? ' (synced to Google Calendar)' : ''}`);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Sync individual supplement to Google Calendar from card
+  const handleSyncSingleSupplementToCalendar = async (supplement: Supplement) => {
+    if (!isGoogleCalendarConnected()) {
+      setCalendarSupplementId(supplement.id);
+      setActiveTab('trends');
+      setToastMessage('Please connect your Google account in the Calendar Hub to sync.');
+      return;
+    }
+
+    try {
+      setToastMessage(`Syncing ${supplement.name} to Google Calendar...`);
+      const res = await syncSupplementToGoogleCalendar(supplement);
+      const updated: Supplement = {
+        ...supplement,
+        syncToGoogleCalendar: true,
+        googleCalendarEventId: res.eventId,
+        lastCalendarSyncAt: new Date().toISOString(),
+      };
+      const newSupplements = supplements.map((s) => (s.id === supplement.id ? updated : s));
+      setSupplements(newSupplements);
+      saveSupplements(newSupplements);
+      setToastMessage(`Synced ${supplement.name} to Google Calendar!`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err: any) {
+      setToastMessage(`Calendar sync error: ${err.message || 'Failed'}`);
+      setTimeout(() => setToastMessage(null), 4000);
+    }
   };
 
   // Delete supplement
   const handleDeleteSupplement = (supplementId: string) => {
     const target = supplements.find((s) => s.id === supplementId);
+    if (target?.googleCalendarEventId && isGoogleCalendarConnected()) {
+      // workspace-integration MANDATORY: User confirmation for destructive operations
+      const confirmed = window.confirm(
+        `Remove the scheduled recurring calendar events for "${target.name}" from your Google Calendar?`
+      );
+      if (confirmed) {
+        deleteSupplementCalendarEvent(target.googleCalendarEventId).catch(console.warn);
+      }
+    }
     const updated = supplements.filter((s) => s.id !== supplementId);
     setSupplements(updated);
     saveSupplements(updated);
@@ -827,6 +890,45 @@ export default function App() {
               }}
             />
 
+            {/* Quick Calendar Access Banner */}
+            <div className="rounded-2xl border border-blue-200/90 dark:border-blue-900/60 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-white dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-stone-900 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <CalendarIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-stone-900 dark:text-white flex items-center gap-2">
+                    <span>Google Calendar Regimen Hub</span>
+                    <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full">
+                      Built-in
+                    </span>
+                  </h3>
+                  <p className="text-xs text-stone-600 dark:text-stone-300">
+                    See on which days you are scheduled to take Vitamin D3 and your other supplements, or sync dosing reminders directly to Google Calendar.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const vitD = supplements.find((s) => s.name.toLowerCase().includes('vitamin d'));
+                    if (vitD) {
+                      setCalendarSupplementId(vitD.id);
+                    } else {
+                      setCalendarSupplementId('all');
+                    }
+                    setActiveTab('calendar');
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CalendarIcon className="w-3.5 h-3.5" />
+                  <span>Open Calendar Schedule</span>
+                </button>
+              </div>
+            </div>
+
             {/* Expiry Alerts Banner (proactive alerts for expired and nearing-expiry stock) */}
             <ExpiryAlertsBanner
               expiredList={expiredSupplements}
@@ -883,6 +985,53 @@ export default function App() {
           </>
         )}
 
+        {/* Dedicated Built-in Calendar Tab View */}
+        {activeTab === 'calendar' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-900 dark:text-white font-display flex items-center gap-2">
+                  <CalendarIcon className="w-6 h-6 text-blue-600" />
+                  <span>Supplement Calendar & Schedule (Google Calendar)</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400">
+                  Select Vitamin D3 or any supplement from your stash to see on which days you take it, review fulfillment, and sync to Google Calendar.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setEditingSupplement(null);
+                    setIsAddModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-stone-900 dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 rounded-xl transition shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Supplement</span>
+                </button>
+              </div>
+            </div>
+
+            <SupplementCalendarView
+              supplements={supplements}
+              logs={logs}
+              currentDate={currentTime}
+              initialSelectedSupplementId={calendarSupplementId}
+              onOpenEditModal={(s) => {
+                setEditingSupplement(s);
+                setIsAddModalOpen(true);
+              }}
+              onQuickLog={(s, amount, notes) => handleTakeDose(s, amount, notes)}
+              onUpdateSupplement={(s) => {
+                const updated = supplements.map((item) => (item.id === s.id ? s : item));
+                setSupplements(updated);
+                saveSupplements(updated);
+              }}
+            />
+          </div>
+        )}
+
         {activeTab === 'supplements' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
@@ -895,7 +1044,34 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* View Switcher: Cards vs Calendar */}
+                <div className="flex items-center p-1 bg-stone-100 dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700">
+                  <button
+                    type="button"
+                    onClick={() => setStashViewMode('cards')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                      stashViewMode === 'cards'
+                        ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs'
+                        : 'text-stone-500 hover:text-stone-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Cards Grid
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStashViewMode('calendar')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+                      stashViewMode === 'calendar'
+                        ? 'bg-white dark:bg-stone-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                        : 'text-stone-500 hover:text-blue-600'
+                    }`}
+                  >
+                    <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Calendar</span>
+                  </button>
+                </div>
+
                 <button
                   onClick={() => handleOpenSpecialChat()}
                   className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-bold text-amber-950 dark:text-amber-100 bg-amber-300 dark:bg-amber-900/90 hover:bg-amber-400 dark:hover:bg-amber-800 border border-amber-400/90 dark:border-amber-700 rounded-xl transition shadow-xs active:scale-[0.98]"
@@ -918,6 +1094,47 @@ export default function App() {
               </div>
             </div>
 
+            {/* Quick Calendar & Schedule Info Banner in Stash */}
+            <div className="rounded-2xl border border-blue-200/80 dark:border-blue-900/60 bg-blue-50/60 dark:bg-blue-950/30 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <CalendarIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-stone-900 dark:text-white block">
+                    Google Calendar Regimen Hub
+                  </span>
+                  <span className="text-stone-600 dark:text-stone-300">
+                    See on which days you take Vitamin D3 or any stash supplement, and sync dosing reminders to Google Calendar.
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const vitD = supplements.find((s) => s.name.toLowerCase().includes('vitamin d'));
+                    if (vitD) {
+                      setCalendarSupplementId(vitD.id);
+                    }
+                    setStashViewMode('calendar');
+                  }}
+                  className="px-3.5 py-1.5 font-bold text-blue-700 dark:text-blue-300 bg-white dark:bg-stone-900 border border-blue-300 dark:border-blue-700 hover:bg-blue-50 rounded-xl transition shadow-2xs whitespace-nowrap cursor-pointer"
+                >
+                  Show Vitamin D3 Days
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('calendar')}
+                  className="px-3.5 py-1.5 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-2xs whitespace-nowrap cursor-pointer"
+                >
+                  Full Calendar Hub
+                </button>
+              </div>
+            </div>
+
             {/* AI Coach Column in Stash View */}
             <AiCoachColumn
               section="stash"
@@ -935,36 +1152,67 @@ export default function App() {
               supplementsCount={supplements.length}
             />
 
-            {/* Active Regimens */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {todayStatuses.map((status) => (
-                <SupplementCard
-                  key={status.supplement.id}
-                  supplement={status.supplement}
-                  status={status}
-                  profile={profileMap.get(status.supplement.profileId || 'profile_self')}
-                  onEdit={(s) => {
-                    setEditingSupplement(s);
-                    setIsAddModalOpen(true);
-                  }}
-                  onDelete={handleDeleteSupplement}
-                  onRenewCourse={handleRenewCourse}
-                  onQuickLog={(s) => handleTakeDose(s)}
-                  onRefillStock={handleRefillStock}
-                />
-              ))}
-            </div>
+            {/* Stash View Content: Either Calendar or Cards */}
+            {stashViewMode === 'calendar' ? (
+              <SupplementCalendarView
+                supplements={supplements}
+                logs={logs}
+                currentDate={currentTime}
+                initialSelectedSupplementId={calendarSupplementId}
+                onOpenEditModal={(s) => {
+                  setEditingSupplement(s);
+                  setIsAddModalOpen(true);
+                }}
+                onQuickLog={(s, amount, notes) => handleTakeDose(s, amount, notes)}
+                onUpdateSupplement={(s) => {
+                  const updated = supplements.map((item) => (item.id === s.id ? s : item));
+                  setSupplements(updated);
+                  saveSupplements(updated);
+                }}
+              />
+            ) : (
+              <>
+                {/* Active Regimens Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {todayStatuses.map((status) => (
+                    <SupplementCard
+                      key={status.supplement.id}
+                      supplement={status.supplement}
+                      status={status}
+                      profile={profileMap.get(status.supplement.profileId || 'profile_self')}
+                      onEdit={(s) => {
+                        setEditingSupplement(s);
+                        setIsAddModalOpen(true);
+                      }}
+                      onDelete={handleDeleteSupplement}
+                      onRenewCourse={handleRenewCourse}
+                      onQuickLog={(s) => handleTakeDose(s)}
+                      onRefillStock={handleRefillStock}
+                      onViewInCalendar={(s) => {
+                        setCalendarSupplementId(s.id);
+                        setStashViewMode('calendar');
+                        setToastMessage(`Showing ${s.name} schedule on calendar`);
+                        setTimeout(() => setToastMessage(null), 3000);
+                      }}
+                      onSyncToCalendar={(s) => {
+                        handleSyncSingleSupplementToCalendar(s);
+                      }}
+                    />
+                  ))}
+                </div>
 
-            {supplements.length === 0 && (
-              <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
-                <p className="text-stone-600 font-medium mb-3">No supplements registered yet.</p>
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-xs font-semibold"
-                >
-                  Create Your First Regimen
-                </button>
-              </div>
+                {supplements.length === 0 && (
+                  <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
+                    <p className="text-stone-600 font-medium mb-3">No supplements registered yet.</p>
+                    <button
+                      onClick={() => setIsAddModalOpen(true)}
+                      className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-xs font-semibold"
+                    >
+                      Create Your First Regimen
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -974,6 +1222,18 @@ export default function App() {
             supplements={supplements}
             logs={logs}
             currentDate={currentTime}
+            initialSupplementId={calendarSupplementId}
+            initialViewMode="calendar"
+            onOpenEditModal={(s) => {
+              setEditingSupplement(s);
+              setIsAddModalOpen(true);
+            }}
+            onQuickLog={(s, amount, notes) => handleTakeDose(s, amount, notes)}
+            onUpdateSupplement={(s) => {
+              const updated = supplements.map((item) => (item.id === s.id ? s : item));
+              setSupplements(updated);
+              saveSupplements(updated);
+            }}
           />
         )}
 

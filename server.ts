@@ -655,8 +655,9 @@ try {
 
 function persistSyncDb() {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    const dir = path.dirname(SYNC_DB_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
     const obj: Record<string, any> = {};
     userCloudStores.forEach((v, k) => {

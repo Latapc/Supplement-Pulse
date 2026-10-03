@@ -68,6 +68,11 @@ export interface Supplement {
   // Expiry date tracking (YYYY-MM-DD)
   expiryDate?: string;
 
+  // Google Calendar Integration
+  syncToGoogleCalendar?: boolean;
+  googleCalendarEventId?: string;
+  lastCalendarSyncAt?: string;
+
   // Course / Timer
   duration: DurationConfig;
   

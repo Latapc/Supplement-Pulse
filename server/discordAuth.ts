@@ -84,8 +84,9 @@ try {
 
 function persistUsersDb() {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    const dir = path.dirname(USERS_DB_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
     const obj: Record<string, UserAccount> = {};
     usersMap.forEach((u, k) => {
@@ -99,8 +100,9 @@ function persistUsersDb() {
 
 function persistEmailLogs() {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    const dir = path.dirname(EMAILS_LOG_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(EMAILS_LOG_FILE, JSON.stringify(emailLogs.slice(-50), null, 2), 'utf-8');
   } catch (err) {

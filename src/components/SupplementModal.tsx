@@ -8,7 +8,9 @@ import {
   Package,
   AlertTriangle,
   Infinity as InfinityIcon,
-  Repeat
+  Repeat,
+  Calendar as CalendarIcon,
+  Utensils
 } from 'lucide-react';
 import { Supplement, DoseUnit, FrequencyType, DayOfWeek, FoodTiming } from '../types/supplement';
 import { UserProfile } from '../types/profile';
@@ -135,6 +137,13 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
   const [monthlyDayOfMonth, setMonthlyDayOfMonth] = useState<number>(1);
   const [intervalDays, setIntervalDays] = useState<number>(2);
 
+  // Timing & Food Intake
+  const [doseTime, setDoseTime] = useState<string>('09:00');
+  const [foodTiming, setFoodTiming] = useState<FoodTiming>('with_food');
+
+  // Google Calendar Integration
+  const [syncToCalendar, setSyncToCalendar] = useState<boolean>(true);
+
   // Special Cyclic Intake (e.g. Boron 2 weeks on, 1 week off)
   const [isCyclic, setIsCyclic] = useState<boolean>(false);
   const [onDays, setOnDays] = useState<number>(14);
@@ -170,6 +179,9 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
       setSelectedDays(editingSupplement.selectedDays || [1]);
       setMonthlyDayOfMonth(editingSupplement.monthlyDayOfMonth || 1);
       setIntervalDays(editingSupplement.intervalDays || 2);
+      setDoseTime(editingSupplement.doseTime || '09:00');
+      setFoodTiming(editingSupplement.foodTiming || 'with_food');
+      setSyncToCalendar(editingSupplement.syncToGoogleCalendar ?? true);
       
       // Cyclic
       setIsCyclic(editingSupplement.cycleConfig?.isCyclic ?? false);
@@ -208,6 +220,9 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
       setSelectedDays([1]);
       setMonthlyDayOfMonth(1);
       setIntervalDays(2);
+      setDoseTime('09:00');
+      setFoodTiming('with_food');
+      setSyncToCalendar(true);
       setIsCyclic(false);
       setOnDays(14);
       setOffDays(7);
@@ -299,6 +314,11 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
       selectedDays: frequencyType === 'weekly' ? selectedDays : undefined,
       monthlyDayOfMonth: frequencyType === 'monthly' ? Number(monthlyDayOfMonth) : undefined,
       intervalDays: frequencyType === 'interval' ? Number(intervalDays) : undefined,
+      doseTime: doseTime || '09:00',
+      foodTiming: foodTiming || 'with_food',
+      syncToGoogleCalendar: syncToCalendar,
+      googleCalendarEventId: editingSupplement?.googleCalendarEventId,
+      lastCalendarSyncAt: editingSupplement?.lastCalendarSyncAt,
       cycleConfig: isCyclic ? {
         isCyclic: true,
         onDays: Math.max(1, Number(onDays) || 14),
@@ -632,6 +652,89 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
                   onChange={(e) => setIntervalDays(Number(e.target.value))}
                   className="w-full h-10 px-3 rounded-xl border border-stone-300 text-stone-900 text-sm font-mono"
                 />
+              </div>
+            )}
+          </div>
+
+          {/* Dosing Time & Food Relation */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-stone-50 border border-stone-200/80">
+            <div>
+              <label className="block text-xs font-semibold text-stone-800 mb-1.5 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-stone-500" />
+                <span>Intake Time Window</span>
+              </label>
+              <input
+                type="time"
+                value={doseTime}
+                onChange={(e) => setDoseTime(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-stone-300 text-stone-900 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                required
+              />
+              <span className="text-[11px] text-stone-500 mt-1 block">
+                Time when daily dosage alert is triggered
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-stone-800 mb-1.5 flex items-center gap-1.5">
+                <Utensils className="w-3.5 h-3.5 text-stone-500" />
+                <span>Food Relation</span>
+              </label>
+              <select
+                value={foodTiming}
+                onChange={(e) => setFoodTiming(e.target.value as any)}
+                className="w-full h-10 px-3 rounded-xl border border-stone-300 text-stone-900 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="with_food">With Food (Ideal for Fat-Solubles: D3, K2, Omega-3)</option>
+                <option value="with_morning_meal">With Morning Meal / Breakfast</option>
+                <option value="before_bed">Before Bed (Ideal for Magnesium, Zinc)</option>
+                <option value="empty_stomach">Empty Stomach (Ideal for Iron, Probiotics)</option>
+                <option value="anytime">Anytime / Flexible</option>
+              </select>
+              <span className="text-[11px] text-stone-500 mt-1 block">
+                Absorption guidance displayed on calendar & notifications
+              </span>
+            </div>
+          </div>
+
+          {/* Google Calendar Automated Sync Toggle */}
+          <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-800/60 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <CalendarIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-stone-900 dark:text-white block">
+                    Sync to Google Calendar
+                  </span>
+                  <span className="text-[11px] text-stone-500 dark:text-stone-400">
+                    Automated calendar event creation and scheduled intake reminders
+                  </span>
+                </div>
+              </div>
+
+              {/* Sync Toggle Switch */}
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={syncToCalendar}
+                  onChange={(e) => setSyncToCalendar(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            {syncToCalendar && (
+              <div className="text-xs text-blue-900 dark:text-blue-200 bg-white/80 dark:bg-stone-900/60 p-2.5 rounded-xl border border-blue-200/60 dark:border-blue-800/60 space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <span>Calendar Sync Active</span>
+                </div>
+                <p className="text-[11px] text-stone-600 dark:text-stone-300">
+                  Will create/update recurring Google Calendar event <strong>"Take {name || 'Supplement'} ({doseAmount.toLocaleString()} {unit})"</strong> at <strong>{doseTime}</strong> on scheduled intake days with 10-minute advance notification. When your schedule changes, the calendar updates automatically.
+                </p>
               </div>
             )}
           </div>

@@ -32,8 +32,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
-            // Block screenshots and screen capture (Android OS FLAG_SECURE)
-            getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+            // Ensure screenshots and screen captures are fully permitted
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
 
             if (this.bridge != null && this.bridge.getWebView() != null) {
                 WebView mainWebView = this.bridge.getWebView();
@@ -46,11 +46,12 @@ public class MainActivity extends BridgeActivity {
                 settings.setSupportMultipleWindows(true);
                 settings.setJavaScriptCanOpenWindowsAutomatically(true);
 
-                // Javascript interface to toggle screenshot protection in sensitive areas
+                // Javascript interface to ensure screenshots are permitted
                 mainWebView.addJavascriptInterface(new Object() {
                     @JavascriptInterface
                     public void enableScreenshotProtection() {
-                        runOnUiThread(() -> getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE));
+                        // Screenshots permitted per user preference
+                        runOnUiThread(() -> getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE));
                     }
                     @JavascriptInterface
                     public void disableScreenshotProtection() {

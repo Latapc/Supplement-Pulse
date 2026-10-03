@@ -171,22 +171,25 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
               </span>
             </div>
 
-            {/* Google Calendar Sync Badge */}
-            {supplement.syncToGoogleCalendar ? (
-              <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 flex items-center gap-1">
-                <CalendarIcon className="w-3 h-3 text-blue-500" />
-                <span>G-Cal Synced</span>
-              </span>
-            ) : onSyncToCalendar ? (
+            {/* Google Calendar Sync Interactive Toggle */}
+            {onSyncToCalendar && (
               <button
                 type="button"
-                onClick={() => onSyncToCalendar(supplement)}
-                className="text-[10px] font-bold text-stone-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSyncToCalendar(supplement);
+                }}
+                title={supplement.syncToGoogleCalendar ? "Sync to Calendar: ENABLED (Click to toggle)" : "Sync to Calendar: DISABLED (Click to enable)"}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 cursor-pointer transition-all ${
+                  supplement.syncToGoogleCalendar
+                    ? 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/80 border-blue-200 dark:border-blue-800 hover:bg-blue-100'
+                    : 'text-stone-500 hover:text-blue-600 bg-stone-100 dark:bg-stone-800 border-stone-200 dark:border-stone-700 hover:border-blue-300'
+                }`}
               >
-                <CalendarIcon className="w-3 h-3" />
-                <span>Sync to G-Cal</span>
+                <CalendarIcon className={`w-3 h-3 ${supplement.syncToGoogleCalendar ? 'text-blue-600 dark:text-blue-400' : 'text-stone-400'}`} />
+                <span>Sync to Calendar: {supplement.syncToGoogleCalendar ? 'ON' : 'OFF'}</span>
               </button>
-            ) : null}
+            )}
           </div>
 
           {/* Weekday Intake Badges (shows on which days of the week it's taken) */}

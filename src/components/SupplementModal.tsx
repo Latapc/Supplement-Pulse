@@ -364,9 +364,24 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
             <h2 className="text-xl sm:text-2xl font-bold text-stone-900 font-display">
               {editingSupplement ? 'Edit Supplement Regimen' : 'Add New Supplement'}
             </h2>
-            <p className="text-xs sm:text-sm text-stone-500 mt-0.5">
-              Set dosage, schedule (daily/weekly/monthly), quantity inventory, and duration timer
-            </p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-xs text-stone-500">
+                Set dosage, schedule, inventory, and duration
+              </span>
+              <button
+                type="button"
+                onClick={() => setSyncToCalendar(!syncToCalendar)}
+                title="Toggle automated Google Calendar event creation for this supplement"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                  syncToCalendar
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-300'
+                }`}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" />
+                <span>Sync to Calendar: <strong>{syncToCalendar ? 'ON' : 'OFF'}</strong></span>
+              </button>
+            </div>
           </div>
           <button
             type="button"
@@ -697,45 +712,72 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
             </div>
           </div>
 
-          {/* Google Calendar Automated Sync Toggle */}
-          <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-800/60 space-y-2.5">
-            <div className="flex items-center justify-between">
+          {/* 'Sync to Calendar' Automated Event Creation Toggle */}
+          <div className={`p-4 rounded-2xl border transition-all ${
+            syncToCalendar 
+              ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-300 dark:border-blue-700 shadow-xs' 
+              : 'bg-stone-50 dark:bg-stone-900 border-stone-200/80 dark:border-stone-800'
+          } space-y-3`}>
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-colors ${
+                  syncToCalendar ? 'bg-blue-600 text-white' : 'bg-stone-200 dark:bg-stone-800 text-stone-500'
+                }`}>
                   <CalendarIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-stone-900 dark:text-white block">
-                    Sync to Google Calendar
-                  </span>
-                  <span className="text-[11px] text-stone-500 dark:text-stone-400">
-                    Automated calendar event creation and scheduled intake reminders
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-stone-900 dark:text-white">
+                      Sync to Calendar
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                      syncToCalendar 
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
+                        : 'bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-400'
+                    }`}>
+                      {syncToCalendar ? 'ENABLED' : 'DISABLED'}
+                    </span>
+                  </div>
+                  <span className="text-xs text-stone-500 dark:text-stone-400 block mt-0.5">
+                    Automated Google Calendar event creation & dynamic schedule syncing
                   </span>
                 </div>
               </div>
 
-              {/* Sync Toggle Switch */}
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={syncToCalendar}
-                  onChange={(e) => setSyncToCalendar(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
+              {/* Prominent Clickable Toggle Switch Button */}
+              <button
+                type="button"
+                onClick={() => setSyncToCalendar(!syncToCalendar)}
+                aria-pressed={syncToCalendar}
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  syncToCalendar ? 'bg-blue-600' : 'bg-stone-300 dark:bg-stone-700'
+                }`}
+                title="Toggle Google Calendar Sync"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out flex items-center justify-center text-[10px] font-bold text-blue-600 ${
+                    syncToCalendar ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                >
+                  {syncToCalendar ? '✓' : ''}
+                </span>
+              </button>
             </div>
 
-            {syncToCalendar && (
-              <div className="text-xs text-blue-900 dark:text-blue-200 bg-white/80 dark:bg-stone-900/60 p-2.5 rounded-xl border border-blue-200/60 dark:border-blue-800/60 space-y-1">
-                <div className="flex items-center gap-1.5 font-semibold">
+            {syncToCalendar ? (
+              <div className="text-xs text-blue-900 dark:text-blue-200 bg-white/90 dark:bg-stone-900/80 p-3 rounded-xl border border-blue-200/80 dark:border-blue-800/80 space-y-1.5 shadow-2xs">
+                <div className="flex items-center gap-1.5 font-semibold text-blue-800 dark:text-blue-300">
                   <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                  <span>Calendar Sync Active</span>
+                  <span>Google Calendar Auto-Sync Active</span>
                 </div>
-                <p className="text-[11px] text-stone-600 dark:text-stone-300">
-                  Will create/update recurring Google Calendar event <strong>"Take {name || 'Supplement'} ({doseAmount.toLocaleString()} {unit})"</strong> at <strong>{doseTime}</strong> on scheduled intake days with 10-minute advance notification. When your schedule changes, the calendar updates automatically.
+                <p className="text-[11px] text-stone-600 dark:text-stone-300 leading-relaxed">
+                  Automatically creates and updates recurring Google Calendar events titled <strong>"Take {name || 'Supplement'} ({doseAmount.toLocaleString()} {unit})"</strong> at <strong>{doseTime}</strong> on your scheduled intake days with a 10-minute advance alert. When dosing schedules change, your calendar stays synchronized.
                 </p>
               </div>
+            ) : (
+              <p className="text-[11px] text-stone-500 dark:text-stone-400 italic">
+                Google Calendar event creation is turned off for this supplement. Doses will only be tracked inside Supple Pulse.
+              </p>
             )}
           </div>
 

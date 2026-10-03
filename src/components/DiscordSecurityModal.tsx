@@ -126,8 +126,8 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
     if (isOpen) {
       setSuggestedPassword(generateNewSuggestion());
 
-      // Enable Android OS screenshot protection (FLAG_SECURE)
-      enableScreenshotProtection();
+      // Ensure screenshot protection is completely disabled so users can capture screenshots
+      disableScreenshotProtection();
 
       // If opening login tab, trigger saved credentials bottom sheet
       if (tab === 'login') {
@@ -138,28 +138,6 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
           }
         }).catch(() => {});
       }
-
-      // Web screenshot protection (intercept PrintScreen, copy protection)
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (
-          e.key === 'PrintScreen' ||
-          (e.ctrlKey && e.key === 'p') ||
-          (e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4' || e.key === 's'))
-        ) {
-          e.preventDefault();
-          try {
-            navigator.clipboard.writeText('');
-          } catch {}
-          setErrorMsg('Screenshots are restricted in this security area for credential protection.');
-          setTimeout(() => setErrorMsg(null), 3000);
-        }
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-        disableScreenshotProtection();
-      };
     }
   }, [isOpen, tab]);
 
@@ -449,7 +427,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-xs overflow-y-auto overscroll-contain">
       <div className="min-h-full w-full flex items-start justify-center p-3 sm:p-6 py-4 sm:py-8">
-        <div className="bg-[#111827] text-stone-100 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-stone-800 my-auto animate-in fade-in zoom-in-95 select-none [user-select:none] [-webkit-user-select:none]">
+        <div className="bg-[#111827] text-stone-100 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-stone-800 my-auto animate-in fade-in zoom-in-95">
           
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-stone-800">
@@ -1043,8 +1021,8 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
       {/* Floating Google Passkey & Autofill Strip (Directly Above the Keyboard - matches IMG20261002074054) */}
       {!currentUser && (isPasswordFocused || isEmailFocused) && (
         <div 
-          className="fixed bottom-0 left-0 right-0 z-60 bg-[#161418]/98 border-t border-stone-800 shadow-[0_-12px_35px_rgba(0,0,0,0.85)] px-3.5 pt-2.5 pb-3.5 animate-slideUp backdrop-blur-md select-none"
-          style={{ transform: 'translateZ(0)', userSelect: 'none', WebkitUserSelect: 'none' }}
+          className="fixed bottom-0 left-0 right-0 z-60 bg-[#161418]/98 border-t border-stone-800 shadow-[0_-12px_35px_rgba(0,0,0,0.85)] px-3.5 pt-2.5 pb-3.5 animate-slideUp backdrop-blur-md"
+          style={{ transform: 'translateZ(0)' }}
         >
           <div className="max-w-md mx-auto">
             {/* Header prompt exactly as shown in photo */}

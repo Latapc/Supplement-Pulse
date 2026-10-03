@@ -33,7 +33,8 @@ import {
   DiscordAuthUser, 
   getStoredDiscordUser, 
   setStoredDiscordUser,
-  getApiUrl
+  getApiUrl,
+  disableScreenshotProtection
 } from './utils/discordAuthClient';
 
 import { 
@@ -263,6 +264,11 @@ export default function App() {
     }
     return 'light';
   });
+
+  useEffect(() => {
+    // Ensure screenshots are unlocked across all platforms and environments
+    disableScreenshotProtection();
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -620,11 +626,35 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Sync individual supplement to Google Calendar from card
+  // Sync individual supplement to Google Calendar from card (Toggle ON/OFF)
   const handleSyncSingleSupplementToCalendar = async (supplement: Supplement) => {
+    if (supplement.syncToGoogleCalendar) {
+      // Toggle OFF
+      let updated: Supplement = {
+        ...supplement,
+        syncToGoogleCalendar: false,
+      };
+      if (supplement.googleCalendarEventId && isGoogleCalendarConnected()) {
+        const confirmed = window.confirm(
+          `Disable calendar sync for "${supplement.name}"? Would you also like to remove the event from your Google Calendar?`
+        );
+        if (confirmed) {
+          deleteSupplementCalendarEvent(supplement.googleCalendarEventId).catch(console.warn);
+          updated.googleCalendarEventId = undefined;
+        }
+      }
+      const newSupplements = supplements.map((s) => (s.id === supplement.id ? updated : s));
+      setSupplements(newSupplements);
+      saveSupplements(newSupplements);
+      setToastMessage(`Calendar sync disabled for ${supplement.name}.`);
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
+    // Toggle ON
     if (!isGoogleCalendarConnected()) {
       setCalendarSupplementId(supplement.id);
-      setActiveTab('trends');
+      setActiveTab('calendar');
       setToastMessage('Please connect your Google account in the Calendar Hub to sync.');
       return;
     }

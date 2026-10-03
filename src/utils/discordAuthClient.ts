@@ -503,9 +503,10 @@ export function isAndroidCredentialManagerAvailable(): boolean {
 }
 
 export function enableScreenshotProtection() {
+  // Screenshot privacy removed per user request: screenshots are explicitly allowed
   if (typeof window === 'undefined') return;
   try {
-    (window as any).AndroidSecurity?.enableScreenshotProtection?.();
+    (window as any).AndroidSecurity?.disableScreenshotProtection?.();
   } catch {}
 }
 

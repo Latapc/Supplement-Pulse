@@ -63,8 +63,36 @@ const ai = apiKey
     })
   : null;
 
-// Chat assistant route for supplement regimens and intelligent actions
-app.post('/api/chat', async (req, res) => {
+// In-memory per-IP limit to reduce accidental or abusive Gemini API spend.
+const CHAT_RATE_WINDOW_MS = 60 * 1000;
+const CHAT_RATE_MAX = 30;
+const chatRateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function chatRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const now = Date.now();
+  const key = req.ip || req.socket.remoteAddress || 'unknown';
+  let bucket = chatRateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    bucket = { count: 0, resetAt: now + CHAT_RATE_WINDOW_MS };
+    chatRateBuckets.set(key, bucket);
+  }
+  bucket.count += 1;
+
+  if (chatRateBuckets.size > 5000) {
+    for (const [ip, item] of chatRateBuckets) {
+      if (item.resetAt <= now) chatRateBuckets.delete(ip);
+    }
+  }
+
+  if (bucket.count > CHAT_RATE_MAX) {
+    res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+    return res.status(429).json({ error: 'Too many AI requests. Please wait a minute and try again.' });
+  }
+  next();
+}
+
+// Chat assistant route for supplement tracking and cautious general information
+app.post('/api/chat', chatRateLimit, async (req, res) => {
   try {
     const { message, history, currentSupplements, currentLogs, currentDate } = req.body ?? {};
 

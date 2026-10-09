@@ -110,7 +110,10 @@ export default function App() {
     setStoredDiscordUser(user);
     if (user) {
       try {
-        const res = await fetch(getApiUrl(`/api/sync/load?userId=account_${user.id}`));
+        const res = await fetch(getApiUrl(`/api/sync/load?userId=account_${user.id}`), {
+          headers: user.token ? { Authorization: `Bearer ${user.token}` } : {},
+        });
+        if (!res.ok) throw new Error('Cloud sync requires an authenticated account session.');
         const data = await res.json();
         if (data?.data?.supplements && Array.isArray(data.data.supplements) && data.data.supplements.length > 0) {
           setSupplements(data.data.supplements);
@@ -144,15 +147,27 @@ export default function App() {
         logs,
         dismissedDoses,
       };
-      await fetch(getApiUrl('/api/sync/save'), {
+      if (!discordUser.token) {
+        throw new Error('Sign in with an online account to back up data securely.');
+      }
+      const response = await fetch(getApiUrl('/api/sync/save'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${discordUser.token}`,
+        },
         body: JSON.stringify({ userId: `account_${discordUser.id}`, payload }),
       });
+      if (!response.ok) {
+        throw new Error(response.status === 401 || response.status === 403
+          ? 'Your session expired. Sign in again before syncing.'
+          : 'Cloud backup failed. Please try again.');
+      }
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setLastSyncedTime(timeStr);
     } catch (e) {
       console.warn('Sync failed:', e);
+      setToastMessage(e instanceof Error ? e.message : 'Cloud backup failed.');
     } finally {
       setIsSyncing(false);
     }
@@ -162,7 +177,17 @@ export default function App() {
     if (!discordUser) return;
     setIsSyncing(true);
     try {
-      const res = await fetch(getApiUrl(`/api/sync/load?userId=account_${discordUser.id}`));
+      if (!discordUser.token) {
+        throw new Error('Sign in with an online account to restore cloud data.');
+      }
+      const res = await fetch(getApiUrl(`/api/sync/load?userId=account_${discordUser.id}`), {
+        headers: { Authorization: `Bearer ${discordUser.token}` },
+      });
+      if (!res.ok) {
+        throw new Error(res.status === 401 || res.status === 403
+          ? 'Your session expired. Sign in again before syncing.'
+          : 'Cloud restore failed. Please try again.');
+      }
       const data = await res.json();
       if (data?.data?.supplements) {
         setSupplements(data.data.supplements);
@@ -179,6 +204,7 @@ export default function App() {
       }
     } catch (e) {
       console.warn('Restore failed:', e);
+      setToastMessage(e instanceof Error ? e.message : 'Cloud restore failed.');
     } finally {
       setIsSyncing(false);
     }

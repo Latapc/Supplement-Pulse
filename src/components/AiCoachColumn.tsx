@@ -50,6 +50,7 @@ export const AiCoachColumn: React.FC<AiCoachColumnProps> = ({
       prompt: 'Explain common supplement label terms such as serving size, active ingredient, and directions. Keep it educational and remind me that label directions and professional advice matter.',
       isSpecial: false,
     },
+  ];
 
   return (
     <div className="w-full bg-white dark:bg-stone-900 rounded-3xl border border-stone-200/90 dark:border-stone-800 p-5 sm:p-6 shadow-xs transition-colors">

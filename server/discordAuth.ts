@@ -401,7 +401,7 @@ export function createDiscordAuthRouter(): express.Router {
 
       if (!user) {
         // Perform a dummy derivation to reduce timing differences for unknown accounts.
-        hashPassword(password, crypto.randomBytes(16).toString('hex'), 1000);
+        hashPassword(password, crypto.randomBytes(16).toString('hex'), PASSWORD_ITERATIONS);
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
@@ -751,6 +751,15 @@ function renderVerifyConfirmationHtml(token: string): string {
 </html>`;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderVerifyResultHtml(opts: {
   success: boolean;
   title: string;
@@ -759,13 +768,17 @@ function renderVerifyResultHtml(opts: {
   email?: string;
 }): string {
   const { success, title, message, ip, email } = opts;
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+  const safeIp = ip ? escapeHtml(ip) : '';
+  const safeEmail = email ? escapeHtml(email) : '';
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${title} - Supple Pulse</title>
+  <title>${safeTitle} - Supple Pulse</title>
   <style>
     body {
       margin: 0;
@@ -844,9 +857,9 @@ function renderVerifyResultHtml(opts: {
 <body>
   <div class="card">
     <div class="icon">${success ? '🛡️' : '⚠️'}</div>
-    <h1>${title}</h1>
-    ${ip ? `<div class="badge">Authorized IP: ${ip}</div>` : ''}
-    <p>${message}</p>
+    <h1>${safeTitle}</h1>
+    ${ip ? `<div class="badge">Authorized IP: ${safeIp}</div>` : ''}
+    <p>${safeMessage}</p>
     <a href="/" class="btn">Return to Supple Pulse</a>
   </div>
 </body>

@@ -980,26 +980,28 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                           <div>Target IP: <span className="text-indigo-300 font-bold">{mail.ip}</span></div>
                         </div>
 
-                        <div className="flex items-center gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => handleQuickAuthorizeSimulated(mail.token)}
-                            className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>Authorize IP ({mail.ip}) Now</span>
-                          </button>
+                        {mail.token && mail.verificationLink && mail.ip && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleQuickAuthorizeSimulated(mail.token)}
+                              className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Authorize IP ({mail.ip}) Now</span>
+                            </button>
 
-                          <a
-                            href={mail.verificationLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2 rounded-xl border border-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-300 transition"
-                            title="Open verification page in new tab"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        </div>
+                            <a
+                              href={mail.verificationLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-2 rounded-xl border border-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-300 transition"
+                              title="Open verification page in new tab"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

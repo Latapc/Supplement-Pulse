@@ -211,6 +211,8 @@ export async function registerWithDiscordSecurity(params: {
     if (
       err?.message &&
       (err.message.includes('already exists') ||
+        err.message.toLowerCase().includes('password') ||
+        err.message.toLowerCase().includes('valid email') ||
         err.message.includes('characters') ||
         err.message.includes('required'))
     ) {
@@ -424,7 +426,11 @@ export async function fetchRecentSecurityEmails(email?: string): Promise<Securit
   const localList = getLocalSecurityEmails();
   try {
     const path = email ? `/api/auth/recent-emails?email=${encodeURIComponent(email)}` : '/api/auth/recent-emails';
-    const data = await safeFetchJson(path);
+    const currentUser = getStoredDiscordUser();
+    if (!currentUser?.token) return localList;
+    const data = await safeFetchJson(path, {
+      headers: { Authorization: `Bearer ${currentUser.token}` },
+    });
     const remoteList = data.emails || [];
     // Merge remote and local, deduping by ID or token
     const seen = new Set<string>();
@@ -444,9 +450,16 @@ export async function fetchRecentSecurityEmails(email?: string): Promise<Securit
 
 export async function revokeAuthorizedIp(email: string, ipToRevoke: string) {
   try {
+    const currentUser = getStoredDiscordUser();
+    if (!currentUser?.token) {
+      throw new Error('Sign in again to manage trusted devices.');
+    }
     const data = await safeFetchJson('/api/auth/revoke-ip', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${currentUser.token}`,
+      },
       body: JSON.stringify({ email, ipToRevoke }),
     });
     return data;

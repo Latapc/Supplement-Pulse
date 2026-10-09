@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Runtime data can contain account records, verification tokens, and user health data.
+/data/*.json
+/data/*.json.*
+/data/*.log

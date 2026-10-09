@@ -534,42 +534,20 @@ export function createDiscordAuthRouter(): express.Router {
     });
   });
 
-  // 4. POST /api/auth/verify-ip-token (programmatic confirmation)
-  router.post('/verify-ip-token', (req, res) => {
-    const { token } = req.body ?? {};
-    if (typeof token !== 'string' || token.length > 128) return res.status(400).json({ error: 'Token is required' });
-
-    const pending = pendingTokensMap.get(token);
-    if (!pending) return res.status(404).json({ error: 'Invalid or expired token' });
-
-    const user = usersMap.get(pending.email.toLowerCase());
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    // Verification links are one-time authorization credentials.
-    user.isEmailVerified = true;
-    // Add IP to authorized list if not present
-    if (!user.authorizedIps.includes(pending.ip)) {
-      user.authorizedIps.push(pending.ip);
-    }
-    user.lastLoginAt = new Date().toISOString();
-    user.lastLoginIp = pending.ip;
-    persistUsersDb();
-
-    pending.authorized = true;
-    const sessionToken = createSession(user.id);
-
-    return res.json({
-      success: true,
-      token: sessionToken,
-      message: 'Device authorized successfully.',
-      authorizedIp: pending.ip,
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        authorizedIps: user.authorizedIps,
-      },
+  // Programmatic verification is intentionally disabled. A client-held pending
+  // token must not be enough to bypass the email confirmation page.
+  router.post('/verify-ip-token', (_req, res) => {
+    return res.status(410).json({
+      error: 'Verification must be completed through the confirmation page sent to your email.',
     });
+  });
+
+  // Revoke the current bearer session when a user signs out.
+  router.post('/logout', (req, res) => {
+    const authorization = req.get('authorization') || '';
+    const match = /^Bearer\\s+([A-Za-z0-9_-]{40,})$/.exec(authorization);
+    if (match) sessionsMap.delete(match[1]);
+    return res.json({ success: true });
   });
 
   // 5. POST /api/auth/resend-verification

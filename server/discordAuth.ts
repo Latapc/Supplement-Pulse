@@ -305,11 +305,11 @@ export function createDiscordAuthRouter(): express.Router {
         salt,
         passwordIterations: PASSWORD_ITERATIONS,
         displayName: typeof displayName === 'string' ? displayName.trim().slice(0, 80) || normalizedEmail.split('@')[0] : normalizedEmail.split('@')[0],
-        isEmailVerified: true,
+        isEmailVerified: false,
         createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString(),
-        lastLoginIp: clientIp,
-        authorizedIps: [clientIp], // Creating device is immediately authorized!
+        lastLoginAt: '',
+        lastLoginIp: '',
+        authorizedIps: [],
       };
 
       usersMap.set(normalizedEmail, newUser);
@@ -328,14 +328,14 @@ export function createDiscordAuthRouter(): express.Router {
         type: 'registration_verify',
         createdAt: new Date().toISOString(),
         expiresAt,
-        authorized: true,
+        authorized: false,
       };
 
       pendingTokensMap.set(token, pendingAuth);
 
-      // Send verification & welcome email to security log
+      // Send the verification link only to the registered email address.
       const baseUrl = getBaseUrl(req);
-      const emailLog = await sendSecurityEmail({
+      await sendSecurityEmail({
         to: normalizedEmail,
         type: 'registration_verify',
         ip: clientIp,
@@ -343,25 +343,16 @@ export function createDiscordAuthRouter(): express.Router {
         userAgent: req.get('user-agent') || 'Unknown',
         baseUrl,
       });
-      const sessionToken = createSession(newUser.id);
 
       return res.json({
         success: true,
-        authorized: true,
-        requiresIpVerification: false,
+        authorized: false,
+        requiresIpVerification: true,
         type: 'registration_verify',
         email: normalizedEmail,
         ip: clientIp,
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          displayName: newUser.displayName,
-          authorizedIps: newUser.authorizedIps,
-          currentIp: clientIp,
-          token: sessionToken,
-        },
-        verificationLink: emailLog.verificationLink,
-        message: 'Account created and device authorized! Welcome to Supple Pulse.',
+        token,
+        message: 'Account created. Check your email to verify the address and authorize this device.',
       });
     } catch (err: any) {
       console.error('Registration error:', err);
@@ -449,7 +440,7 @@ export function createDiscordAuthRouter(): express.Router {
       pendingTokensMap.set(token, pendingAuth);
 
       const baseUrl = getBaseUrl(req);
-      const emailLog = await sendSecurityEmail({
+      await sendSecurityEmail({
         to: normalizedEmail,
         type: pendingAuth.type,
         ip: clientIp,
@@ -466,8 +457,7 @@ export function createDiscordAuthRouter(): express.Router {
         email: normalizedEmail,
         ip: clientIp,
         token,
-        verificationLink: emailLog.verificationLink,
-        message: 'New location / IP detected! Please check your email to authorize this IP address.',
+        message: 'New location detected. Check your email to authorize this device.',
       });
     } catch (err: any) {
       console.error('Login error:', err);

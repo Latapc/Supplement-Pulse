@@ -278,12 +278,14 @@ export function createDiscordAuthRouter(): express.Router {
   router.post('/register', async (req, res) => {
     try {
       const { email, password, displayName } = req.body ?? {};
-      if (!email || !password) {
-        return res.status(400).json({ error: 'Email and password are required' });
+      if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
+        return res.status(400).json({ error: 'Email and password are required.' });
       }
-
-      if (password.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      if (password.length < 8 || password.length > 1024) {
+        return res.status(400).json({ error: 'Password must be between 8 and 1024 characters.' });
+      }
+      if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        return res.status(400).json({ error: 'Enter a valid email address.' });
       }
 
       const normalizedEmail = email.trim().toLowerCase();
@@ -293,7 +295,7 @@ export function createDiscordAuthRouter(): express.Router {
 
       const clientIp = getClientIp(req);
       const salt = crypto.randomBytes(16).toString('hex');
-      const passwordHash = hashPassword(password, salt);
+      const passwordHash = hashPassword(password, salt, PASSWORD_ITERATIONS);
       const userId = `usr_${crypto.randomBytes(8).toString('hex')}`;
 
       const newUser: UserAccount = {
@@ -301,7 +303,8 @@ export function createDiscordAuthRouter(): express.Router {
         email: normalizedEmail,
         passwordHash,
         salt,
-        displayName: displayName?.trim() || normalizedEmail.split('@')[0],
+        passwordIterations: PASSWORD_ITERATIONS,
+        displayName: typeof displayName === 'string' ? displayName.trim().slice(0, 80) || normalizedEmail.split('@')[0] : normalizedEmail.split('@')[0],
         isEmailVerified: true,
         createdAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
@@ -340,6 +343,7 @@ export function createDiscordAuthRouter(): express.Router {
         userAgent: req.get('user-agent') || 'Unknown',
         baseUrl,
       });
+      const sessionToken = createSession(newUser.id);
 
       return res.json({
         success: true,
@@ -348,13 +352,13 @@ export function createDiscordAuthRouter(): express.Router {
         type: 'registration_verify',
         email: normalizedEmail,
         ip: clientIp,
-        token,
         user: {
           id: newUser.id,
           email: newUser.email,
           displayName: newUser.displayName,
           authorizedIps: newUser.authorizedIps,
           currentIp: clientIp,
+          token: sessionToken,
         },
         verificationLink: emailLog.verificationLink,
         message: 'Account created and device authorized! Welcome to Supple Pulse.',
@@ -537,7 +541,6 @@ export function createDiscordAuthRouter(): express.Router {
     persistUsersDb();
 
     pending.authorized = true;
-    pendingTokensMap.delete(token);
     const sessionToken = createSession(user.id);
 
     return res.json({

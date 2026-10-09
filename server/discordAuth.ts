@@ -277,7 +277,7 @@ export function createDiscordAuthRouter(): express.Router {
   // 1. POST /api/auth/register
   router.post('/register', async (req, res) => {
     try {
-      const { email, password, displayName } = req.body;
+      const { email, password, displayName } = req.body ?? {};
       if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required' });
       }
@@ -368,22 +368,34 @@ export function createDiscordAuthRouter(): express.Router {
   // 2. POST /api/auth/login
   router.post('/login', async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const { email, password } = req.body ?? {};
       if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required' });
       }
 
+      if (typeof email !== 'string' || typeof password !== 'string' || email.length > 254 || password.length > 1024) {
+        return res.status(400).json({ error: 'Email and password must be valid text values.' });
+      }
       const normalizedEmail = email.trim().toLowerCase();
       const user = usersMap.get(normalizedEmail);
 
       if (!user) {
+        // Perform a dummy derivation to reduce timing differences for unknown accounts.
+        hashPassword(password, crypto.randomBytes(16).toString('hex'), 1000);
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
-      // Verify password
-      const calculatedHash = hashPassword(password, user.salt);
-      if (calculatedHash !== user.passwordHash) {
+      // Existing accounts without metadata retain their legacy iteration count until
+      // a successful login, when the stored hash is upgraded.
+      const iterations = Number.isInteger(user.passwordIterations) ? user.passwordIterations! : 1000;
+      const calculatedHash = hashPassword(password, user.salt, iterations);
+      if (!hashesMatch(calculatedHash, user.passwordHash)) {
         return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      if (iterations < PASSWORD_ITERATIONS) {
+        user.passwordHash = hashPassword(password, user.salt, PASSWORD_ITERATIONS);
+        user.passwordIterations = PASSWORD_ITERATIONS;
       }
 
       const clientIp = getClientIp(req);
@@ -397,7 +409,8 @@ export function createDiscordAuthRouter(): express.Router {
         user.lastLoginIp = clientIp;
         persistUsersDb();
 
-        const sessionToken = crypto.randomBytes(32).toString('hex');
+        persistUsersDb();
+        const sessionToken = createSession(user.id);
         return res.json({
           success: true,
           authorized: true,
@@ -488,7 +501,7 @@ export function createDiscordAuthRouter(): express.Router {
             authorizedIps: user.authorizedIps,
             currentIp: pending.ip,
           },
-          token: crypto.randomBytes(32).toString('hex'),
+          token: createSession(user.id),
           message: 'IP successfully authorized!',
         });
       }
@@ -504,8 +517,8 @@ export function createDiscordAuthRouter(): express.Router {
 
   // 4. POST /api/auth/verify-ip-token (programmatic confirmation)
   router.post('/verify-ip-token', (req, res) => {
-    const { token } = req.body;
-    if (!token) return res.status(400).json({ error: 'Token is required' });
+    const { token } = req.body ?? {};
+    if (typeof token !== 'string' || token.length > 128) return res.status(400).json({ error: 'Token is required' });
 
     const pending = pendingTokensMap.get(token);
     if (!pending) return res.status(404).json({ error: 'Invalid or expired token' });
@@ -513,7 +526,7 @@ export function createDiscordAuthRouter(): express.Router {
     const user = usersMap.get(pending.email.toLowerCase());
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Mark user email as verified
+    // Verification links are one-time authorization credentials.
     user.isEmailVerified = true;
     // Add IP to authorized list if not present
     if (!user.authorizedIps.includes(pending.ip)) {
@@ -524,10 +537,13 @@ export function createDiscordAuthRouter(): express.Router {
     persistUsersDb();
 
     pending.authorized = true;
+    pendingTokensMap.delete(token);
+    const sessionToken = createSession(user.id);
 
     return res.json({
       success: true,
-      message: `IP ${pending.ip} authorized successfully for ${user.email}!`,
+      token: sessionToken,
+      message: 'Device authorized successfully.',
       authorizedIp: pending.ip,
       user: {
         id: user.id,
@@ -540,21 +556,13 @@ export function createDiscordAuthRouter(): express.Router {
 
   // 5. POST /api/auth/resend-verification
   router.post('/resend-verification', async (req, res) => {
-    const { token, email } = req.body;
-    let pending: PendingIpAuth | undefined;
-
-    if (token) {
-      pending = pendingTokensMap.get(token);
-    } else if (email) {
-      for (const p of pendingTokensMap.values()) {
-        if (p.email.toLowerCase() === email.trim().toLowerCase()) {
-          pending = p;
-          break;
-        }
-      }
+    const { token } = req.body ?? {};
+    if (typeof token !== 'string' || token.length > 128) {
+      return res.status(400).json({ error: 'A valid verification request is required.' });
     }
+    const pending = pendingTokensMap.get(token);
 
-    if (!pending) {
+    if (!pending || pending.authorized || new Date() > new Date(pending.expiresAt)) {
       return res.status(404).json({ error: 'No active pending authorization found to resend.' });
     }
 
@@ -573,41 +581,41 @@ export function createDiscordAuthRouter(): express.Router {
 
     return res.json({
       success: true,
-      message: 'New authorization email sent!',
-      verificationLink: emailLog.verificationLink,
+      message: 'A new authorization email has been sent if the request is still active.',
     });
   });
 
   // 6. GET /api/auth/recent-emails (Interactive Security Mailbox for quick access)
   router.get('/recent-emails', (req, res) => {
-    const email = req.query.email as string;
-    let filtered = emailLogs;
-    if (email) {
-      filtered = emailLogs.filter((e) => e.to.toLowerCase() === email.trim().toLowerCase());
-    }
-    return res.json({
-      success: true,
-      emails: filtered.slice(0, 10),
-    });
+    const currentUser = getAuthenticatedUser(req);
+    if (!currentUser) return res.status(401).json({ error: 'Authentication required.' });
+
+    // Never expose verification tokens or links via the security mailbox API.
+    const filtered = emailLogs
+      .filter((entry) => entry.to.toLowerCase() === currentUser.email.toLowerCase())
+      .slice(0, 10)
+      .map(({ token: _token, verificationLink: _link, ip: _ip, ...safeEntry }) => safeEntry);
+
+    return res.json({ success: true, emails: filtered });
   });
 
   // 7. POST /api/auth/revoke-ip
   router.post('/revoke-ip', (req, res) => {
-    const { email, ipToRevoke } = req.body;
-    if (!email || !ipToRevoke) {
-      return res.status(400).json({ error: 'Email and ipToRevoke are required' });
+    const currentUser = getAuthenticatedUser(req);
+    if (!currentUser) return res.status(401).json({ error: 'Authentication required.' });
+
+    const { ipToRevoke } = req.body ?? {};
+    if (typeof ipToRevoke !== 'string' || !ipToRevoke || ipToRevoke.length > 64) {
+      return res.status(400).json({ error: 'A valid IP address is required.' });
     }
 
-    const user = usersMap.get(email.trim().toLowerCase());
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    user.authorizedIps = user.authorizedIps.filter((ip) => ip !== ipToRevoke);
+    currentUser.authorizedIps = currentUser.authorizedIps.filter((ip) => ip !== ipToRevoke);
     persistUsersDb();
 
     return res.json({
       success: true,
-      authorizedIps: user.authorizedIps,
-      message: `IP ${ipToRevoke} has been revoked. Any sign-in from that IP will require re-authorization.`,
+      authorizedIps: currentUser.authorizedIps,
+      message: 'Device authorization revoked.',
     });
   });
 

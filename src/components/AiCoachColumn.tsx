@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, ArrowRight, ShieldCheck, Repeat, Infinity as InfinityIcon, Utensils, MessageSquare, Zap } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, Utensils, MessageSquare, BookOpen, ClipboardList } from 'lucide-react';
 
 interface AiCoachColumnProps {
   onOpenChat: (initialPrompt?: string, specialMode?: boolean) => void;
@@ -23,34 +23,33 @@ export const AiCoachColumn: React.FC<AiCoachColumnProps> = ({
 
   const quickProtocols = [
     {
-      label: 'Deep Sleep & Cortisol',
-      desc: 'Original Sleep Protocol',
-      icon: Sparkles,
-      prompt: 'Formulate an original clinical protocol for deep Slow-Wave Sleep and evening cortisol reduction.',
-      isSpecial: true,
-    },
-    {
-      label: 'Dopamine & Focus',
-      desc: 'Cognitive Protocol',
-      icon: Zap,
-      prompt: 'Formulate an original clinical protocol for sustained executive focus, dopamine support, and mental clarity.',
-      isSpecial: true,
-    },
-    {
-      label: 'Audit Stack Synergies',
-      desc: 'Biochemical Safety Audit',
-      icon: ShieldCheck,
-      prompt: 'Review all my registered supplements for biochemical synergies, absorption competition, and circadian timing conflicts.',
+      label: 'Understand a label',
+      desc: 'Plain-language explanation',
+      icon: BookOpen,
+      prompt: 'Help me understand the wording on a supplement label. Explain common terms and uncertainties in plain language; do not recommend a dose or tell me to start taking it.',
       isSpecial: false,
     },
     {
-      label: 'Pulsed Boron Cycling',
-      desc: '2w ON / 1w OFF Regimen',
-      icon: Repeat,
-      prompt: 'Formulate an original cyclic protocol: Boron 6mg take every day for 2 weeks, then break for 1 week, repeat for life.',
-      isSpecial: true,
+      label: 'Safety questions',
+      desc: 'Prepare for a pharmacist',
+      icon: ShieldCheck,
+      prompt: 'Help me prepare neutral questions for a pharmacist about possible supplement and medication interactions. Explain that a professional needs my full medication list and health context; do not diagnose or prescribe.',
+      isSpecial: false,
     },
-  ];
+    {
+      label: 'Review my records',
+      desc: 'Summarize logged information',
+      icon: ClipboardList,
+      prompt: 'Summarize my saved supplement records and dose logs only. Flag missing information or entries I may want to verify, without suggesting new supplements or changing doses.',
+      isSpecial: false,
+    },
+    {
+      label: 'Food & label terms',
+      desc: 'Learn the basics',
+      icon: Utensils,
+      prompt: 'Explain common supplement label terms such as serving size, active ingredient, and directions. Keep it educational and remind me that label directions and professional advice matter.',
+      isSpecial: false,
+    },
 
   return (
     <div className="w-full bg-white dark:bg-stone-900 rounded-3xl border border-stone-200/90 dark:border-stone-800 p-5 sm:p-6 shadow-xs transition-colors">
@@ -72,7 +71,7 @@ export const AiCoachColumn: React.FC<AiCoachColumnProps> = ({
             <p className="text-xs text-stone-600 dark:text-stone-300 mt-0.5">
               {section === 'today'
                 ? 'Get personalized timing advice, dose reminders, or check safety conflicts for today\'s intake.'
-                : 'Configure complex cyclic protocols, lifetime infinity schedules, or analyze your current stash.'}
+                : 'Review your saved list and learn how to interpret supplement labels safely.'}
             </p>
           </div>
         </div>
@@ -95,8 +94,8 @@ export const AiCoachColumn: React.FC<AiCoachColumnProps> = ({
             onChange={(e) => setQuickQuestion(e.target.value)}
             placeholder={
               section === 'today'
-                ? "Ask AI Coach: 'Should I take Magnesium before sleep?' or 'Check my morning doses'..."
-                : "Ask AI Coach: 'Add Zinc 30mg daily with food' or 'Check Boron & D3 interaction'..."
+                ? "Ask about a label term or how to prepare for a pharmacist visit..."
+                : "Ask to summarize your saved records or explain label wording..."
             }
             className="w-full px-4 py-2.5 text-xs sm:text-sm bg-stone-50 dark:bg-stone-800/90 border border-stone-200 dark:border-stone-700 rounded-2xl text-stone-900 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
           />
@@ -111,10 +110,14 @@ export const AiCoachColumn: React.FC<AiCoachColumnProps> = ({
         </button>
       </form>
 
+      <p className="mt-2 text-[11px] leading-5 text-stone-500 dark:text-stone-400">
+        Educational support only—not medical advice. The coach cannot determine a safe dose or replace a clinician or pharmacist.
+      </p>
+
       {/* Suggested Quick Protocol Chips */}
       <div className="mt-3.5">
         <div className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">
-          Recommended Protocols & Coach Actions
+          Helpful questions
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {quickProtocols.map((item, idx) => {

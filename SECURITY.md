@@ -17,6 +17,7 @@ Removing a file from the current branch does not remove it from earlier Git comm
 
 ## Deployment configuration
 
+- `APP_BASE_URL`: canonical public base URL used to create verification links. Set this to the trusted HTTPS app origin; the server does not build links from an untrusted `Host` header.
 - `CORS_ORIGINS`: comma-separated exact browser origins allowed to call the API. Configure this to the actual production web origin(s); the defaults are local development and Capacitor origins.
 - `TRUST_PROXY=true`: set only when deployed behind one trusted reverse proxy that sanitizes forwarded headers. Leave unset otherwise.
 - Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, and `SMTP_PASS` to deliver verification email. Do not expose verification links in client-facing diagnostics.

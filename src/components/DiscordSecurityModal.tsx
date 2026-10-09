@@ -536,7 +536,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
                     className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-md cursor-pointer"
                   >
                     <Inbox className="w-4 h-4" />
-                    <span>View Sent Email & Authorize in 1 Click</span>
+                    <span>Open Local Security Mailbox</span>
                   </button>
 
                   <div className="flex items-center gap-2">
@@ -977,7 +977,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
 
                         <div className="p-2.5 rounded-xl bg-stone-950 text-xs space-y-1 font-mono text-stone-300">
                           <div>To: <span className="text-white">{mail.to}</span></div>
-                          <div>Target IP: <span className="text-indigo-300 font-bold">{mail.ip}</span></div>
+                          {mail.ip && <div>Target IP: <span className="text-indigo-300 font-bold">{mail.ip}</span></div>}
                         </div>
 
                         {mail.token && mail.verificationLink && mail.ip && (

@@ -101,17 +101,7 @@ try {
   console.warn('Could not read users_auth_db.json:', err);
 }
 
-try {
-  if (fs.existsSync(EMAILS_LOG_FILE)) {
-    const raw = fs.readFileSync(EMAILS_LOG_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      emailLogs.push(...parsed.slice(-50));
-    }
-  }
-} catch (err) {
-  console.warn('Could not read security_emails.json:', err);
-}
+// Verification links and tokens are intentionally not loaded from disk.
 
 function persistUsersDb() {
   try {
@@ -126,18 +116,6 @@ function persistUsersDb() {
     fs.writeFileSync(USERS_DB_FILE, JSON.stringify(obj, null, 2), 'utf-8');
   } catch (err) {
     console.error('Failed to persist users_auth_db.json:', err);
-  }
-}
-
-function persistEmailLogs() {
-  try {
-    const dir = path.dirname(EMAILS_LOG_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(EMAILS_LOG_FILE, JSON.stringify(emailLogs.slice(-50), null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Failed to persist security_emails.json:', err);
   }
 }
 
@@ -275,8 +253,7 @@ async function sendSecurityEmail(params: {
     contentSnippet: `IP ${ip} authorization link sent`,
     token,
   };
-  emailLogs.unshift(emailLog);
-  persistEmailLogs();
+  // Verification tokens are not retained in the in-app security mailbox.
 
   // If real SMTP is configured, send actual outbound email
   if (transporter) {
@@ -292,7 +269,7 @@ async function sendSecurityEmail(params: {
       console.error(`[Security Email] SMTP delivery failed for ${to}:`, err);
     }
   } else {
-    console.log(`[Security Email] Logged in security mailbox: ${to} -> ${verificationLink}`);
+    console.warn('[Security Email] SMTP is not configured; verification email was not sent.');
   }
 
   return emailLog;
@@ -330,10 +307,15 @@ export function createDiscordAuthRouter(): express.Router {
   const router = express.Router();
 
   // Helper to get base URL for links
-  function getBaseUrl(req: express.Request): string {
-    const host = req.get('host') || 'localhost:3000';
-    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
-    return `${protocol}://${host}`;
+  function getBaseUrl(_req: express.Request): string {
+    const configuredUrl = process.env.APP_BASE_URL;
+    if (!configuredUrl) return 'http://localhost:3000';
+
+    const parsed = new URL(configuredUrl);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      throw new Error('APP_BASE_URL must use HTTP or HTTPS.');
+    }
+    return parsed.origin;
   }
 
   // 1. POST /api/auth/register

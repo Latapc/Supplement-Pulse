@@ -582,7 +582,7 @@ export function createDiscordAuthRouter(): express.Router {
   // Revoke the current bearer session when a user signs out.
   router.post('/logout', (req, res) => {
     const authorization = req.get('authorization') || '';
-    const match = /^Bearer\\s+([A-Za-z0-9_-]{40,})$/.exec(authorization);
+    const match = /^Bearer\s+([A-Za-z0-9_-]{40,})$/.exec(authorization);
     if (match) sessionsMap.delete(match[1]);
     return res.json({ success: true });
   });

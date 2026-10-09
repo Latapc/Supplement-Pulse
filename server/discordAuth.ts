@@ -117,14 +117,11 @@ function hashPassword(password: string, salt: string): string {
 
 // Helper to extract true client IP
 export function getClientIp(req: express.Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') {
-    const first = forwarded.split(',')[0].trim();
-    if (first && first !== '::1' && first !== '127.0.0.1') return first;
-  }
-  const remote = req.socket.remoteAddress || req.ip || '127.0.0.1';
+  // req.ip respects Express's explicitly configured trust-proxy policy.
+  // Never trust a caller-supplied X-Forwarded-For header directly.
+  const remote = req.ip || req.socket.remoteAddress || '127.0.0.1';
   if (remote === '::1' || remote === '::ffff:127.0.0.1') return '127.0.0.1';
-  return remote.replace(/^.*:/, ''); // strip IPv6 prefix if mapped IPv4
+  return remote.startsWith('::ffff:') ? remote.slice(7) : remote;
 }
 
 // Nodemailer transporter (uses SMTP if environment variables exist)
@@ -264,6 +261,34 @@ async function sendSecurityEmail(params: {
   return emailLog;
 }
 
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_MAX_ATTEMPTS = 10;
+const authAttemptBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function authRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const now = Date.now();
+  const key = getClientIp(req);
+  let bucket = authAttemptBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    bucket = { count: 0, resetAt: now + AUTH_WINDOW_MS };
+    authAttemptBuckets.set(key, bucket);
+  }
+  bucket.count += 1;
+
+  // Opportunistically prune expired entries so this map remains bounded over time.
+  if (authAttemptBuckets.size > 5000) {
+    for (const [ip, item] of authAttemptBuckets) {
+      if (item.resetAt <= now) authAttemptBuckets.delete(ip);
+    }
+  }
+
+  if (bucket.count > AUTH_MAX_ATTEMPTS) {
+    res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+    return res.status(429).json({ error: 'Too many authentication attempts. Please wait before trying again.' });
+  }
+  next();
+}
+
 export function createDiscordAuthRouter(): express.Router {
   const router = express.Router();
 
@@ -275,7 +300,7 @@ export function createDiscordAuthRouter(): express.Router {
   }
 
   // 1. POST /api/auth/register
-  router.post('/register', async (req, res) => {
+  router.post('/register', authRateLimit, async (req, res) => {
     try {
       const { email, password, displayName } = req.body ?? {};
       if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
@@ -361,7 +386,7 @@ export function createDiscordAuthRouter(): express.Router {
   });
 
   // 2. POST /api/auth/login
-  router.post('/login', async (req, res) => {
+  router.post('/login', authRateLimit, async (req, res) => {
     try {
       const { email, password } = req.body ?? {};
       if (!email || !password) {
@@ -548,7 +573,7 @@ export function createDiscordAuthRouter(): express.Router {
   });
 
   // 5. POST /api/auth/resend-verification
-  router.post('/resend-verification', async (req, res) => {
+  router.post('/resend-verification', authRateLimit, async (req, res) => {
     const { token } = req.body ?? {};
     if (typeof token !== 'string' || token.length > 128) {
       return res.status(400).json({ error: 'A valid verification request is required.' });

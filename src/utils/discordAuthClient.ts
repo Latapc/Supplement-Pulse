@@ -478,6 +478,14 @@ export async function revokeAuthorizedIp(email: string, ipToRevoke: string) {
 }
 
 export function logoutDiscordUser() {
+  const current = getStoredDiscordUser();
+  if (current?.token) {
+    // Best-effort server revocation; clear local state immediately regardless.
+    void safeFetchJson('/api/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${current.token}` },
+    }).catch(() => undefined);
+  }
   setStoredDiscordUser(null);
 }
 

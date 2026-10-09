@@ -12,6 +12,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+// Enable this only when the app is behind a single trusted reverse proxy.
+app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
 app.use(express.json({ limit: '128kb' }));
 app.use(express.urlencoded({ extended: true, limit: '128kb' }));
 

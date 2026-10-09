@@ -417,8 +417,11 @@ export async function resendVerificationEmail(params: { token?: string; email?: 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
-  } catch {
-    return { success: true, message: 'Verification link renewed in local security mailbox.' };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || 'Could not resend the verification email. Please try again.',
+    };
   }
 }
 
@@ -463,14 +466,14 @@ export async function revokeAuthorizedIp(email: string, ipToRevoke: string) {
       body: JSON.stringify({ email, ipToRevoke }),
     });
     return data;
-  } catch {
+  } catch (err: any) {
     const current = getStoredDiscordUser();
-    if (current) {
+    if (current && !current.token) {
       current.authorizedIps = current.authorizedIps.filter((ip) => ip !== ipToRevoke);
       setStoredDiscordUser(current);
       return { success: true, authorizedIps: current.authorizedIps };
     }
-    return { success: true, authorizedIps: [] };
+    throw err;
   }
 }
 

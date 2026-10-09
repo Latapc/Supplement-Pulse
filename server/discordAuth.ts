@@ -9,6 +9,7 @@ export interface UserAccount {
   email: string;
   passwordHash: string;
   salt: string;
+  passwordIterations?: number;
   displayName: string;
   isEmailVerified: boolean;
   createdAt: string;
@@ -56,8 +57,38 @@ try {
 
 // Memory caches
 const usersMap = new Map<string, UserAccount>(); // key: lowercase email
-const pendingTokensMap = new Map<string, PendingIpAuth>(); // key: token
+const pendingTokensMap = new Map<string, PendingIpAuth>(); // key: verification token
+const sessionsMap = new Map<string, { userId: string; expiresAt: number }>();
 const emailLogs: SecurityEmailLog[] = [];
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const PASSWORD_ITERATIONS = 210_000;
+
+function createSession(userId: string): string {
+  const token = crypto.randomBytes(32).toString('base64url');
+  sessionsMap.set(token, { userId, expiresAt: Date.now() + SESSION_TTL_MS });
+  return token;
+}
+
+export function getAuthenticatedUser(req: express.Request): UserAccount | null {
+  const authorization = req.get('authorization') || '';
+    const match = /^Bearer\s+([A-Za-z0-9_-]{40,})$/.exec(authorization);
+  if (!match) return null;
+
+  const token = match[1];
+  const session = sessionsMap.get(token);
+  if (!session) return null;
+  if (session.expiresAt <= Date.now()) {
+    sessionsMap.delete(token);
+    return null;
+  }
+
+  for (const user of usersMap.values()) {
+    if (user.id === session.userId) return user;
+  }
+  sessionsMap.delete(token);
+  return null;
+}
 
 // Initialize databases from disk
 try {
@@ -110,9 +141,15 @@ function persistEmailLogs() {
   }
 }
 
-// Password hashing
-function hashPassword(password: string, salt: string): string {
-  return crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+// PBKDF2 with per-account iteration metadata supports gradual upgrades for older accounts.
+function hashPassword(password: string, salt: string, iterations = PASSWORD_ITERATIONS): string {
+  return crypto.pbkdf2Sync(password, salt, iterations, 64, 'sha512').toString('hex');
+}
+
+function hashesMatch(candidate: string, stored: string): boolean {
+  const a = Buffer.from(candidate, 'hex');
+  const b = Buffer.from(stored, 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 // Helper to extract true client IP

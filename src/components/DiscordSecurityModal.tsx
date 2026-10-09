@@ -367,8 +367,11 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
         token: pendingAuth.token,
         email: pendingAuth.email,
       });
+      if (!res?.success) {
+        throw new Error(res?.message || 'Could not resend the verification email.');
+      }
       setResendCooldown(30);
-      setSuccessMsg('Fresh authorization link sent!');
+      setSuccessMsg('Verification email resent. Check your inbox.');
       loadEmails(pendingAuth.email);
       setTimeout(() => setSuccessMsg(null), 3500);
     } catch (err: any) {

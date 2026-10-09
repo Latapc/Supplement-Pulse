@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
-import { createDiscordAuthRouter, handleVerifyIpHtml } from './server/discordAuth';
+import { createDiscordAuthRouter, getAuthenticatedUser, handleVerifyIpHtml } from './server/discordAuth';
 
 dotenv.config();
 
@@ -12,16 +12,39 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '128kb' }));
+app.use(express.urlencoded({ extended: true, limit: '128kb' }));
 
-// Enable CORS for Android APK (Capacitor https://localhost) and external clients
+// Restrict cross-origin browser access. Set CORS_ORIGINS to a comma-separated
+// list of exact trusted origins for deployed web clients.
+const defaultCorsOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost',
+  'https://localhost',
+  'capacitor://localhost',
+];
+const allowedCorsOrigins = new Set(
+  (process.env.CORS_ORIGINS || defaultCorsOrigins.join(','))
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Vary', 'Origin');
+  const origin = req.get('origin');
+
+  if (origin && allowedCorsOrigins.has(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  } else if (origin && req.method === 'OPTIONS') {
+    return res.status(403).json({ error: 'Origin is not allowed by CORS policy.' });
+  }
+
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+    return res.sendStatus(204);
   }
   next();
 });
@@ -670,12 +693,22 @@ function persistSyncDb() {
 }
 
 app.post('/api/sync/save', (req, res) => {
-  const { userId, payload } = req.body;
-  if (!userId || !payload) {
-    return res.status(400).json({ error: 'userId and payload are required' });
+  const user = getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required.' });
   }
+
+  const { userId, payload } = req.body ?? {};
+  const expectedUserId = `account_${user.id}`;
+  if (typeof userId !== 'string' || userId !== expectedUserId) {
+    return res.status(403).json({ error: 'You can only save data for your own account.' });
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return res.status(400).json({ error: 'A valid sync payload is required.' });
+  }
+
   const timestamp = new Date().toISOString();
-  userCloudStores.set(userId, {
+  userCloudStores.set(expectedUserId, {
     ...payload,
     savedAt: timestamp,
   });
@@ -684,20 +717,41 @@ app.post('/api/sync/save', (req, res) => {
 });
 
 app.get('/api/sync/load', (req, res) => {
-  const userId = req.query.userId as string;
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
+  const user = getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required.' });
   }
-  const data = userCloudStores.get(userId);
+
+  const userId = req.query.userId;
+  const expectedUserId = `account_${user.id}`;
+  if (typeof userId !== 'string') {
+    return res.status(400).json({ error: 'userId is required.' });
+  }
+  if (userId !== expectedUserId) {
+    return res.status(403).json({ error: 'You can only load data for your own account.' });
+  }
+
+  const data = userCloudStores.get(expectedUserId);
   return res.json({ success: true, data: data || null });
 });
 
 app.delete('/api/sync/delete', (req, res) => {
-  const userId = req.query.userId as string;
-  if (userId) {
-    userCloudStores.delete(userId);
-    persistSyncDb();
+  const user = getAuthenticatedUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required.' });
   }
+
+  const userId = req.query.userId;
+  const expectedUserId = `account_${user.id}`;
+  if (typeof userId !== 'string') {
+    return res.status(400).json({ error: 'userId is required.' });
+  }
+  if (userId !== expectedUserId) {
+    return res.status(403).json({ error: 'You can only delete data for your own account.' });
+  }
+
+  userCloudStores.delete(expectedUserId);
+  persistSyncDb();
   return res.json({ success: true });
 });
 

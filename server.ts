@@ -294,6 +294,7 @@ app.delete('/api/sync/delete', (req, res) => {
 // Discord-style Security & IP Authentication Endpoints
 app.use('/api/auth', createDiscordAuthRouter());
 app.get('/verify-ip', handleVerifyIpHtml);
+app.post('/verify-ip', handleVerifyIpHtml);
 
 async function main() {
   const isProd = process.env.NODE_ENV === 'production';

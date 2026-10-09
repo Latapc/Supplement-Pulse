@@ -654,9 +654,9 @@ export function createDiscordAuthRouter(): express.Router {
 
 // Dedicated HTML page handler for /verify-ip?token=...
 export function handleVerifyIpHtml(req: express.Request, res: express.Response) {
-  const token = req.query.token as string;
+  const token = req.method === 'POST' ? req.body?.token : req.query.token;
 
-  if (!token) {
+  if (typeof token !== 'string' || !/^[a-f0-9]{48}$/.test(token)) {
     return res.status(400).send(renderVerifyResultHtml({
       success: false,
       title: 'Missing Authorization Token',
@@ -691,7 +691,19 @@ export function handleVerifyIpHtml(req: express.Request, res: express.Response) 
     }));
   }
 
-  // Authorize the IP!
+  // A GET must only display a confirmation page. Email security scanners often
+  // prefetch links; requiring an explicit POST avoids authorizing a device on preview.
+  if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.send(renderVerifyConfirmationHtml(token));
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).send('Method not allowed');
+  }
+
+  // Authorize the IP only after the user confirms the POST form.
   user.isEmailVerified = true;
   if (!user.authorizedIps.includes(pending.ip)) {
     user.authorizedIps.push(pending.ip);
@@ -709,6 +721,34 @@ export function handleVerifyIpHtml(req: express.Request, res: express.Response) 
     email: user.email,
     message: `IP address ${pending.ip} has been successfully authorized for ${user.email}. Your app session will now automatically unlock.`,
   }));
+}
+
+function renderVerifyConfirmationHtml(token: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Confirm Device Authorization - Supple Pulse</title>
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box;background:#090d16;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif}
+    main{max-width:440px;width:100%;padding:32px;border:1px solid #334155;border-radius:20px;background:#111827;text-align:center}
+    p{color:#cbd5e1;line-height:1.6}
+    button{border:0;border-radius:12px;background:#059669;color:white;padding:13px 22px;font-weight:700;font-size:15px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Confirm this device</h1>
+    <p>Only continue if you requested this sign-in or account verification. Confirming will verify your email address and authorize the device that started the request.</p>
+    <form method="post" action="/verify-ip">
+      <input type="hidden" name="token" value="${token}">
+      <button type="submit">Confirm and authorize device</button>
+    </form>
+  </main>
+</body>
+</html>`;
 }
 
 function renderVerifyResultHtml(opts: {

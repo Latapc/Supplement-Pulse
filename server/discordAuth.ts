@@ -44,7 +44,6 @@ export interface SecurityEmailLog {
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const USERS_DB_FILE = path.join(DATA_DIR, 'users_auth_db.json');
-const EMAILS_LOG_FILE = path.join(DATA_DIR, 'security_emails.json');
 
 // Ensure storage directory exists
 try {

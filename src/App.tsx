@@ -81,6 +81,7 @@ import {
   Calendar as CalendarIcon
 } from 'lucide-react';
 import { SupplementCalendarView } from './components/SupplementCalendarView';
+import { DashboardOverview } from './components/DashboardOverview';
 
 export default function App() {
   const [supplements, setSupplements] = useState<Supplement[]>([]);
@@ -927,7 +928,7 @@ export default function App() {
         
         {/* Toast Notification Alert */}
         {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-stone-800 animate-in fade-in slide-in-from-bottom-2">
+          <div role="status" aria-live="polite" className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 sm:max-w-md z-50 bg-stone-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-stone-800 animate-in fade-in slide-in-from-bottom-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>{toastMessage}</span>
           </div>
@@ -941,6 +942,16 @@ export default function App() {
               todayStatuses={todayStatuses}
               currentDate={currentTime}
               onOpenAddModal={() => {
+                setEditingSupplement(null);
+                setIsAddModalOpen(true);
+              }}
+            />
+
+            <DashboardOverview
+              supplements={supplements}
+              todayStatuses={todayStatuses}
+              onChangeTab={setActiveTab}
+              onAddSupplement={() => {
                 setEditingSupplement(null);
                 setIsAddModalOpen(true);
               }}

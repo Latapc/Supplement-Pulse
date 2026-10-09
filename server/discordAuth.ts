@@ -335,6 +335,11 @@ export function createDiscordAuthRouter(): express.Router {
       if (usersMap.has(normalizedEmail)) {
         return res.status(400).json({ error: 'An account with this email already exists. Please sign in.' });
       }
+      if (!transporter || (process.env.NODE_ENV === 'production' && !process.env.APP_BASE_URL)) {
+        return res.status(503).json({
+          error: 'Email verification is not configured on this server. Please try again later.',
+        });
+      }
 
       const clientIp = getClientIp(req);
       const salt = crypto.randomBytes(16).toString('hex');
@@ -464,7 +469,14 @@ export function createDiscordAuthRouter(): express.Router {
         });
       }
 
-      // NEW / UNRECOGNIZED IP (or unverified account): Require Discord-style IP authorization!
+      // A new device must be verified through email; fail closed if delivery is unavailable.
+      if (!transporter || (process.env.NODE_ENV === 'production' && !process.env.APP_BASE_URL)) {
+        return res.status(503).json({
+          error: 'Email verification is not available right now. Please try again later.',
+        });
+      }
+
+      // NEW / UNRECOGNIZED IP (or unverified account): Require email authorization.
       const token = crypto.randomBytes(24).toString('hex');
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 

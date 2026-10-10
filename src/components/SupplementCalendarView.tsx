@@ -931,11 +931,21 @@ export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
                       )
                     )}
 
+                    <a
+                      href={generateGoogleCalendarWebUrl(supp)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Direct Google Calendar Event Link (1-tap open in Google Calendar)"
+                      className="p-2 text-stone-600 hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition flex items-center"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+
                     <button
                       type="button"
                       onClick={() => handleSyncSupplement(supp)}
                       title="Sync this supplement to Google Calendar"
-                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-xl transition"
+                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-xl transition cursor-pointer"
                     >
                       <CalendarIcon className="w-4 h-4" />
                     </button>

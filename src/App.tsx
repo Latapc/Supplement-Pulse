@@ -79,14 +79,12 @@ import {
   Sparkles,
   Calendar as CalendarIcon
 } from 'lucide-react';
-import { SupplementCalendarView } from './components/SupplementCalendarView';
 
 export default function App() {
   const [supplements, setSupplements] = useState<Supplement[]>([]);
   const [logs, setLogs] = useState<DoseLog[]>([]);
-  const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'supplements' | 'trends' | 'history'>('today');
+  const [activeTab, setActiveTab] = useState<'today' | 'supplements' | 'trends' | 'history'>('today');
   const [calendarSupplementId, setCalendarSupplementId] = useState<string>('all');
-  const [stashViewMode, setStashViewMode] = useState<'cards' | 'calendar'>('cards');
   
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -652,8 +650,8 @@ export default function App() {
     // Toggle ON
     if (!isGoogleCalendarConnected()) {
       setCalendarSupplementId(supplement.id);
-      setActiveTab('calendar');
-      setToastMessage('Please connect your Google account in the Calendar Hub to sync.');
+      setActiveTab('trends');
+      setToastMessage('Please connect your Google account in Trends & Insights Calendar to sync.');
       return;
     }
 
@@ -973,53 +971,6 @@ export default function App() {
           </>
         )}
 
-        {/* Dedicated Built-in Calendar Tab View */}
-        {activeTab === 'calendar' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-900 dark:text-white font-display flex items-center gap-2">
-                  <CalendarIcon className="w-6 h-6 text-blue-600" />
-                  <span>Supplement Calendar & Schedule (Google Calendar)</span>
-                </h2>
-                <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400">
-                  Select Vitamin D3 or any supplement from your stash to see on which days you take it, review fulfillment, and sync to Google Calendar.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setEditingSupplement(null);
-                    setIsAddModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-stone-900 dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 rounded-xl transition shadow-xs"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Supplement</span>
-                </button>
-              </div>
-            </div>
-
-            <SupplementCalendarView
-              supplements={supplements}
-              logs={logs}
-              currentDate={currentTime}
-              initialSelectedSupplementId={calendarSupplementId}
-              onOpenEditModal={(s) => {
-                setEditingSupplement(s);
-                setIsAddModalOpen(true);
-              }}
-              onQuickLog={(s, amount, notes) => handleTakeDose(s, amount, notes)}
-              onUpdateSupplement={(s) => {
-                const updated = supplements.map((item) => (item.id === s.id ? s : item));
-                setSupplements(updated);
-                saveSupplements(updated);
-              }}
-            />
-          </div>
-        )}
-
         {activeTab === 'supplements' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
@@ -1033,36 +984,9 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                {/* View Switcher: Cards vs Calendar */}
-                <div className="flex items-center p-1 bg-stone-100 dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-700">
-                  <button
-                    type="button"
-                    onClick={() => setStashViewMode('cards')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
-                      stashViewMode === 'cards'
-                        ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs'
-                        : 'text-stone-500 hover:text-stone-900 dark:hover:text-white'
-                    }`}
-                  >
-                    Cards Grid
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStashViewMode('calendar')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
-                      stashViewMode === 'calendar'
-                        ? 'bg-white dark:bg-stone-900 text-blue-600 dark:text-blue-400 shadow-xs'
-                        : 'text-stone-500 hover:text-blue-600'
-                    }`}
-                  >
-                    <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Calendar</span>
-                  </button>
-                </div>
-
                 <button
                   onClick={() => handleOpenSpecialChat()}
-                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-bold text-amber-950 dark:text-amber-100 bg-amber-300 dark:bg-amber-900/90 hover:bg-amber-400 dark:hover:bg-amber-800 border border-amber-400/90 dark:border-amber-700 rounded-xl transition shadow-xs active:scale-[0.98]"
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-bold text-amber-950 dark:text-amber-100 bg-amber-300 dark:bg-amber-900/90 hover:bg-amber-400 dark:hover:bg-amber-800 border border-amber-400/90 dark:border-amber-700 rounded-xl transition shadow-xs active:scale-[0.98] cursor-pointer"
                   title="Special Protocols: Cyclic intake (e.g. Boron 2w on / 1w off), custom intervals, infinity"
                 >
                   <Sparkles className="w-4 h-4 text-amber-900 dark:text-amber-300" />
@@ -1074,7 +998,7 @@ export default function App() {
                     setEditingSupplement(null);
                     setIsAddModalOpen(true);
                   }}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-stone-900 dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-white rounded-xl transition shadow-xs w-fit"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-stone-900 dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-white rounded-xl transition shadow-xs w-fit cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Supplement</span>
@@ -1099,67 +1023,45 @@ export default function App() {
               supplementsCount={supplements.length}
             />
 
-            {/* Stash View Content: Either Calendar or Cards */}
-            {stashViewMode === 'calendar' ? (
-              <SupplementCalendarView
-                supplements={supplements}
-                logs={logs}
-                currentDate={currentTime}
-                initialSelectedSupplementId={calendarSupplementId}
-                onOpenEditModal={(s) => {
-                  setEditingSupplement(s);
-                  setIsAddModalOpen(true);
-                }}
-                onQuickLog={(s, amount, notes) => handleTakeDose(s, amount, notes)}
-                onUpdateSupplement={(s) => {
-                  const updated = supplements.map((item) => (item.id === s.id ? s : item));
-                  setSupplements(updated);
-                  saveSupplements(updated);
-                }}
-              />
-            ) : (
-              <>
-                {/* Active Regimens Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {todayStatuses.map((status) => (
-                    <SupplementCard
-                      key={status.supplement.id}
-                      supplement={status.supplement}
-                      status={status}
-                      profile={profileMap.get(status.supplement.profileId || 'profile_self')}
-                      onEdit={(s) => {
-                        setEditingSupplement(s);
-                        setIsAddModalOpen(true);
-                      }}
-                      onDelete={handleDeleteSupplement}
-                      onRenewCourse={handleRenewCourse}
-                      onQuickLog={(s) => handleTakeDose(s)}
-                      onRefillStock={handleRefillStock}
-                      onViewInCalendar={(s) => {
-                        setCalendarSupplementId(s.id);
-                        setStashViewMode('calendar');
-                        setToastMessage(`Showing ${s.name} schedule on calendar`);
-                        setTimeout(() => setToastMessage(null), 3000);
-                      }}
-                      onSyncToCalendar={(s) => {
-                        handleSyncSingleSupplementToCalendar(s);
-                      }}
-                    />
-                  ))}
-                </div>
+            {/* Active Regimens Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {todayStatuses.map((status) => (
+                <SupplementCard
+                  key={status.supplement.id}
+                  supplement={status.supplement}
+                  status={status}
+                  profile={profileMap.get(status.supplement.profileId || 'profile_self')}
+                  onEdit={(s) => {
+                    setEditingSupplement(s);
+                    setIsAddModalOpen(true);
+                  }}
+                  onDelete={handleDeleteSupplement}
+                  onRenewCourse={handleRenewCourse}
+                  onQuickLog={(s) => handleTakeDose(s)}
+                  onRefillStock={handleRefillStock}
+                  onViewInCalendar={(s) => {
+                    setCalendarSupplementId(s.id);
+                    setActiveTab('trends');
+                    setToastMessage(`Viewing ${s.name} schedule on Trends & Insights Calendar`);
+                    setTimeout(() => setToastMessage(null), 3000);
+                  }}
+                  onSyncToCalendar={(s) => {
+                    handleSyncSingleSupplementToCalendar(s);
+                  }}
+                />
+              ))}
+            </div>
 
-                {supplements.length === 0 && (
-                  <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
-                    <p className="text-stone-600 font-medium mb-3">No supplements registered yet.</p>
-                    <button
-                      onClick={() => setIsAddModalOpen(true)}
-                      className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-xs font-semibold"
-                    >
-                      Create Your First Regimen
-                    </button>
-                  </div>
-                )}
-              </>
+            {supplements.length === 0 && (
+              <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
+                <p className="text-stone-600 font-medium mb-3">No supplements registered yet.</p>
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Create Your First Regimen
+                </button>
+              </div>
             )}
           </div>
         )}

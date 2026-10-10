@@ -1329,12 +1329,6 @@ export default function App() {
         onDeleteProfile={handleDeleteProfile}
       />
 
-      {/* Android APK & Mobile Application Hub Modal */}
-      <AndroidInstallModal
-        isOpen={isAndroidModalOpen}
-        onClose={() => setIsAndroidModalOpen(false)}
-      />
-
       {/* Discord-Style Security & IP Authorization Modal */}
       <DiscordSecurityModal
         isOpen={isDiscordSecurityOpen}

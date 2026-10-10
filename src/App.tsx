@@ -27,7 +27,6 @@ import {
   ChatActionSnapshot 
 } from './components/AiChatDrawer';
 import { ProfileSwitcherModal } from './components/ProfileSwitcherModal';
-import { AndroidInstallModal } from './components/AndroidInstallModal';
 import { DiscordSecurityModal } from './components/DiscordSecurityModal';
 import { 
   DiscordAuthUser, 
@@ -100,7 +99,6 @@ export default function App() {
   const [profiles, setProfiles] = useState<UserProfile[]>(() => loadProfiles());
   const [activeProfileId, setActiveProfileId] = useState<string>(() => loadActiveProfileId());
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
   const [discordUser, setDiscordUser] = useState<DiscordAuthUser | null>(() => getStoredDiscordUser());
   const [isDiscordSecurityOpen, setIsDiscordSecurityOpen] = useState(false);
 
@@ -887,7 +885,6 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenProfileSwitcher={() => setIsProfileModalOpen(true)}
-        onOpenAndroidInstall={() => setIsAndroidModalOpen(true)}
         todayDueCount={todayDueCount}
         discordUser={discordUser}
         onOpenDiscordSecurity={() => setIsDiscordSecurityOpen(true)}

@@ -54,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
         
         {/* Mobile menu + Branding & Profile Switcher */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-          <button type="button" onClick={() => setMobileMenuOpen((open) => !open)} aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={mobileMenuOpen} className="sm:hidden w-9 h-9 rounded-xl flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-900">
+          <button type="button" onClick={() => setMobileMenuOpen((open) => !open)} aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={mobileMenuOpen} className="sm:hidden w-10 h-10 rounded-xl flex items-center justify-center text-stone-700 dark:text-stone-200 bg-stone-100 dark:bg-stone-900 hover:bg-stone-200 dark:hover:bg-stone-800">
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           {/* Vertical Upright Capsule Logo with Prominent Middle Line */}
@@ -178,9 +178,9 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
       {/* Mobile navigation drawer */}
       {mobileMenuOpen && (
-        <div className="sm:hidden fixed inset-0 top-14 z-[60]">
-          <button type="button" aria-label="Close navigation menu" className="absolute inset-0 bg-stone-950/45" onClick={() => setMobileMenuOpen(false)} />
-          <nav aria-label="Main navigation" className="relative h-full w-[min(82vw,320px)] bg-white dark:bg-stone-950 border-r border-stone-200 dark:border-stone-800 shadow-2xl p-4 flex flex-col gap-2">
+        <div className="sm:hidden">
+          <button type="button" aria-label="Close navigation menu" className="fixed inset-x-0 top-14 bottom-0 z-[65] bg-black/60" onClick={() => setMobileMenuOpen(false)} />
+          <nav aria-label="Main navigation" className="fixed left-0 top-14 bottom-0 z-[70] w-[82vw] max-w-[320px] overflow-y-auto overscroll-contain bg-white text-stone-900 dark:bg-stone-950 dark:text-stone-100 border-r border-stone-200 dark:border-stone-800 shadow-2xl p-4 flex flex-col gap-2">
             <div className="px-3 py-3 mb-1">
               <p className="text-xs uppercase tracking-[0.16em] font-bold text-emerald-700 dark:text-emerald-400">Supple Pulse</p>
               <p className="text-lg font-bold text-stone-900 dark:text-white mt-1">Your dashboard</p>
@@ -191,7 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="block text-sm font-bold">{label}</span><span className="block text-xs mt-0.5 opacity-70">{description}</span>
               </button>
             ))}
-            <div className="mt-2 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 p-4">
+            <div className="mt-auto rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-900">
               <p className="text-xs uppercase tracking-wider font-bold text-stone-500 dark:text-stone-400">Profile</p>
               <p className="text-sm font-bold text-stone-900 dark:text-white mt-2 truncate">{activeProfile.name}</p>
               <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenProfileSwitcher(); }} className="mt-3 w-full text-left rounded-xl px-3 py-2 text-sm font-semibold text-stone-800 dark:text-stone-100 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700">Switch profile</button>

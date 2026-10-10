@@ -48,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 dark:bg-stone-950/95 backdrop-blur-md border-b border-stone-200/80 dark:border-stone-900 transition-colors w-full max-w-full">
+    <header className={`sticky top-0 ${mobileMenuOpen ? "z-[100]" : "z-40"} bg-white/95 dark:bg-stone-950/95 backdrop-blur-md border-b border-stone-200/80 dark:border-stone-900 transition-colors w-full max-w-full">
       {/* Row 1: Top Bar with Branding, Profile Switcher & Actions */}
       <div className="max-w-5xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-1.5 sm:gap-2">
         
@@ -179,8 +179,8 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Mobile navigation drawer */}
       {mobileMenuOpen && (
         <div className="sm:hidden">
-          <button type="button" aria-label="Close navigation menu" className="fixed inset-x-0 top-14 bottom-0 z-[65] bg-black/60" onClick={() => setMobileMenuOpen(false)} />
-          <nav aria-label="Main navigation" className="fixed left-0 top-14 bottom-0 z-[70] w-[82vw] max-w-[320px] overflow-y-auto overscroll-contain bg-white text-stone-900 dark:bg-stone-950 dark:text-stone-100 border-r border-stone-200 dark:border-stone-800 shadow-2xl p-4 flex flex-col gap-2">
+          <button type="button" aria-label="Close navigation menu" className="fixed inset-x-0 top-14 bottom-0 z-[101] bg-black/60" onClick={() => setMobileMenuOpen(false)} />
+          <nav aria-label="Main navigation" className="fixed left-0 top-14 bottom-0 z-[102] w-[82vw] max-w-[320px] overflow-y-auto overscroll-contain bg-white text-stone-900 dark:bg-stone-950 dark:text-stone-100 border-r border-stone-200 dark:border-stone-800 shadow-2xl p-4 flex flex-col gap-2">
             <div className="px-3 py-3 mb-1">
               <p className="text-xs uppercase tracking-[0.16em] font-bold text-emerald-700 dark:text-emerald-400">Supple Pulse</p>
               <p className="text-lg font-bold text-stone-900 dark:text-white mt-1">Your dashboard</p>

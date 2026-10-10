@@ -917,45 +917,6 @@ export default function App() {
               }}
             />
 
-            {/* Quick Calendar Access Banner */}
-            <div className="rounded-2xl border border-blue-200/90 dark:border-blue-900/60 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-white dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-stone-900 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
-                  <CalendarIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-stone-900 dark:text-white flex items-center gap-2">
-                    <span>Google Calendar Regimen Hub</span>
-                    <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full">
-                      Built-in
-                    </span>
-                  </h3>
-                  <p className="text-xs text-stone-600 dark:text-stone-300">
-                    See on which days you are scheduled to take Vitamin D3 and your other supplements, or sync dosing reminders directly to Google Calendar.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const vitD = supplements.find((s) => s.name.toLowerCase().includes('vitamin d'));
-                    if (vitD) {
-                      setCalendarSupplementId(vitD.id);
-                    } else {
-                      setCalendarSupplementId('all');
-                    }
-                    setActiveTab('calendar');
-                  }}
-                  className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <CalendarIcon className="w-3.5 h-3.5" />
-                  <span>Open Calendar Schedule</span>
-                </button>
-              </div>
-            </div>
-
             {/* Expiry Alerts Banner (proactive alerts for expired and nearing-expiry stock) */}
             <ExpiryAlertsBanner
               expiredList={expiredSupplements}
@@ -1117,47 +1078,6 @@ export default function App() {
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Supplement</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Calendar & Schedule Info Banner in Stash */}
-            <div className="rounded-2xl border border-blue-200/80 dark:border-blue-900/60 bg-blue-50/60 dark:bg-blue-950/30 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                  <CalendarIcon className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="font-bold text-stone-900 dark:text-white block">
-                    Google Calendar Regimen Hub
-                  </span>
-                  <span className="text-stone-600 dark:text-stone-300">
-                    See on which days you take Vitamin D3 or any stash supplement, and sync dosing reminders to Google Calendar.
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const vitD = supplements.find((s) => s.name.toLowerCase().includes('vitamin d'));
-                    if (vitD) {
-                      setCalendarSupplementId(vitD.id);
-                    }
-                    setStashViewMode('calendar');
-                  }}
-                  className="px-3.5 py-1.5 font-bold text-blue-700 dark:text-blue-300 bg-white dark:bg-stone-900 border border-blue-300 dark:border-blue-700 hover:bg-blue-50 rounded-xl transition shadow-2xs whitespace-nowrap cursor-pointer"
-                >
-                  Show Vitamin D3 Days
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('calendar')}
-                  className="px-3.5 py-1.5 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-2xs whitespace-nowrap cursor-pointer"
-                >
-                  Full Calendar Hub
                 </button>
               </div>
             </div>

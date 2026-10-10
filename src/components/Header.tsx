@@ -21,7 +21,6 @@ interface HeaderProps {
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
   onOpenProfileSwitcher: () => void;
-  onOpenAndroidInstall: () => void;
   todayDueCount: number;
   discordUser?: DiscordAuthUser | null;
   onOpenDiscordSecurity?: () => void;
@@ -100,43 +99,6 @@ export const Header: React.FC<HeaderProps> = ({
             <CalendarIcon className={`w-3.5 h-3.5 ${activeTab === 'calendar' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
             <span className="font-bold text-[11px] sm:text-xs">Calendar</span>
           </button>
-
-          {/* Discord-Style Security Account Button */}
-          {onOpenDiscordSecurity && (
-            <button
-              onClick={onOpenDiscordSecurity}
-              title={discordUser ? `IP Verified Account: ${discordUser.email}` : 'Sign In / Account Security'}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-2xl border transition shadow-xs cursor-pointer shrink-0 ${
-                discordUser
-                  ? 'bg-indigo-50 text-indigo-900 border-indigo-200/90 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800'
-                  : 'bg-[#5865F2] hover:bg-[#4752C4] text-white border-indigo-400/30'
-              }`}
-            >
-              <Shield className={`w-3.5 h-3.5 ${discordUser ? 'text-indigo-600 dark:text-indigo-400' : 'text-white'} shrink-0`} />
-              {discordUser ? (
-                <span className="text-[11px] truncate max-w-[80px] sm:max-w-[130px] font-bold">
-                  {discordUser.displayName || discordUser.email.split('@')[0]}
-                </span>
-              ) : (
-                <div className="flex flex-col text-left leading-none py-0.5">
-                  <span className="text-[9px] sm:text-[10px] font-medium opacity-90 leading-tight">Security</span>
-                  <span className="text-[11px] font-bold leading-tight">Sign-In</span>
-                </div>
-              )}
-            </button>
-          )}
-
-          {/* Android APK & Mobile Application Hub Icon Button */}
-          {onOpenAndroidInstall && (
-            <button
-              type="button"
-              onClick={onOpenAndroidInstall}
-              title="Android Mobile App Hub"
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-950/80 border border-emerald-800/80 text-emerald-400 flex items-center justify-center font-bold text-xs hover:bg-emerald-900 transition-colors shadow-2xs cursor-pointer shrink-0"
-            >
-              c
-            </button>
-          )}
 
           {/* Theme Toggle Button */}
           {onToggleTheme && (
@@ -230,7 +192,12 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="block text-sm font-bold">{label}</span><span className="block text-xs mt-0.5 opacity-70">{description}</span>
               </button>
             ))}
-            <div className="mt-auto rounded-2xl bg-stone-50 dark:bg-stone-900 p-4"><p className="text-xs font-semibold text-stone-700 dark:text-stone-200">Active profile</p><p className="text-sm font-bold text-stone-900 dark:text-white mt-1 truncate">{activeProfile.name}</p><button type="button" onClick={() => { setMobileMenuOpen(false); onOpenProfileSwitcher(); }} className="mt-3 text-xs font-bold text-emerald-700 dark:text-emerald-400">Switch profile</button></div>
+            <div className="mt-2 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 p-4">
+              <p className="text-xs uppercase tracking-wider font-bold text-stone-500 dark:text-stone-400">Profile</p>
+              <p className="text-sm font-bold text-stone-900 dark:text-white mt-2 truncate">{activeProfile.name}</p>
+              <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenProfileSwitcher(); }} className="mt-3 w-full text-left rounded-xl px-3 py-2 text-sm font-semibold text-stone-800 dark:text-stone-100 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700">Switch profile</button>
+              {onOpenDiscordSecurity && <button type="button" onClick={() => { setMobileMenuOpen(false); onOpenDiscordSecurity(); }} className="mt-2 w-full text-left rounded-xl px-3 py-2 text-sm font-semibold text-indigo-800 dark:text-indigo-200 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800"><span className="flex items-center gap-2"><Shield className="w-4 h-4" />{discordUser ? 'Account & Cloud Sync' : 'Sign in / Account'}</span>{discordUser?.email && <span className="block text-xs mt-1 opacity-75 truncate">{discordUser.email}</span>}</button>}
+            </div>
           </nav>
         </div>
       )}

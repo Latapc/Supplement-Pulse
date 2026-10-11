@@ -191,34 +191,7 @@ export default function App() {
     }
   };
 
-  // Keep an encrypted Drive copy up to date after edits. The current local cache
-  // remains for compatibility/offline resilience; Drive is the cross-device copy.
-  useEffect(() => {
-    if (!discordUser || !cloudReady || cloudSyncUidRef.current !== discordUser.id) return;
-    const uid = discordUser.id;
-    const timer = window.setTimeout(async () => {
-      if (cloudSyncUidRef.current !== uid) return;
-      setIsSyncing(true);
-      try {
-        await saveAutomaticDriveData({
-          version: 2,
-          appName: 'Supple Pulse',
-          updatedAt: new Date().toISOString(),
-          supplements,
-          logs,
-          profiles,
-          activeProfileId,
-          dismissedDoses,
-        });
-        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      } catch (e: any) {
-        setToastMessage(e?.message || 'Cloud backup failed. Keep the app open and try again.');
-      } finally {
-        setIsSyncing(false);
-      }
-    }, 1200);
-    return () => window.clearTimeout(timer);
-  }, [discordUser, cloudReady, supplements, logs, profiles, activeProfileId, dismissedDoses]);
+
 
   const handleDiscordSyncRegimen = async () => {
     if (!discordUser) return;
@@ -427,6 +400,35 @@ export default function App() {
       return {};
     }
   });
+
+  // Keep an encrypted Drive copy up to date after edits. The current local cache
+  // remains for compatibility/offline resilience; Drive is the cross-device copy.
+  useEffect(() => {
+    if (!discordUser || !cloudReady || cloudSyncUidRef.current !== discordUser.id) return;
+    const uid = discordUser.id;
+    const timer = window.setTimeout(async () => {
+      if (cloudSyncUidRef.current !== uid) return;
+      setIsSyncing(true);
+      try {
+        await saveAutomaticDriveData({
+          version: 2,
+          appName: 'Supple Pulse',
+          updatedAt: new Date().toISOString(),
+          supplements,
+          logs,
+          profiles,
+          activeProfileId,
+          dismissedDoses,
+        });
+        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      } catch (e: any) {
+        setToastMessage(e?.message || 'Cloud backup failed. Keep the app open and try again.');
+      } finally {
+        setIsSyncing(false);
+      }
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [discordUser, cloudReady, supplements, logs, profiles, activeProfileId, dismissedDoses]);
 
   // Account Security & Cloud Sync State
   const [isSyncing, setIsSyncing] = useState<boolean>(false);

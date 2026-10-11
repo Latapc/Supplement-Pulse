@@ -84,7 +84,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
         </div>
 
         <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-slate-300">
-          Backups are encrypted on your device with AES-256-GCM before upload. A separate passphrase derives the encryption key and is never saved or sent to Supple Pulse. You need the same passphrase to restore on another device. Google sign-in alone cannot decrypt the backup.
+          Your data is encrypted in the browser before it is uploaded to Google Drive. Sign in with the same Google account on another device to restore it automatically. For convenience, the encryption key is stored in a separate file in that account's private app-data area; this means the design is not developer-blind encryption.
         </div>
 
         {currentUser ? (

@@ -108,7 +108,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
         {loading && <p className="mt-4 text-center text-sm text-slate-400">Please wait…</p>}
         {error && <p role="alert" className="mt-4 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{error}</p>}
         {message && <p role="status" className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-200">{message}</p>}
-        <p className="mt-5 text-xs leading-5 text-slate-500">Keep your backup passphrase safe. If you lose it, the encrypted backup cannot be recovered by Supple Pulse. Backups are manual; local working data remains on this device. Google may require OAuth verification before public use.</p>
+        <p className="mt-5 text-xs leading-5 text-slate-500">Data is automatically restored after Google sign-in and automatically backed up after edits. A local working cache remains on this device for offline resilience. The cloud key is stored alongside the encrypted data in the same Google account's private app-data area, so this is convenience-focused encryption, not protection against someone who can access both files. Google may require OAuth verification before public use.</p>
       </section>
     </div>
   );

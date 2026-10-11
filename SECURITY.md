@@ -6,9 +6,9 @@ Last reviewed: 2026-10-11
 
 - The unauthenticated cloud-sync read, write, and delete endpoints are disabled. They previously trusted a caller-supplied user ID.
 - Sign-in uses Google through Firebase Authentication; the former custom password/IP routes are not mounted.
-- Google Drive backups are encrypted in the browser before upload using AES-256-GCM. A separate passphrase is converted into a key with PBKDF2-SHA-256 (310,000 iterations and a random salt). A fresh random nonce is generated for each backup.
-- The backup passphrase and derived encryption key are not stored by the app or sent to its server. Google sign-in alone does not decrypt the backup.
-- Backup and restore are manual. Users must remember the passphrase; it cannot be recovered by the app.
+- Google Drive account data is encrypted in the browser using AES-256-GCM before upload. The current convenience-focused flow automatically generates a random AES-256 key and stores that key in a separate file in the same Google Drive `appDataFolder` as the ciphertext.
+- Google sign-in restores the account's cloud data automatically; edits are automatically backed up after a short debounce.
+- Because the key and ciphertext are both accessible through the same Google account's app-data scope, this is not developer-blind or strong end-to-end encryption. Anyone who obtains both files can decrypt the data. The design prioritizes easy recovery and account-level access control over key secrecy.
 - The legacy unauthenticated server sync endpoints remain disabled.
 
 ## Important limitations

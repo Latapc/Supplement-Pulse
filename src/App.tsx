@@ -46,7 +46,9 @@ import { UserProfile, INITIAL_PROFILES } from './types/profile';
 import { 
   syncSupplementToGoogleCalendar, 
   deleteSupplementCalendarEvent, 
-  isGoogleCalendarConnected 
+  isGoogleCalendarConnected,
+  savePrivateDriveBackup,
+  loadPrivateDriveBackup
 } from './utils/googleCalendar';
 import { 
   loadSupplements, 
@@ -103,30 +105,45 @@ export default function App() {
   const [discordUser, setDiscordUser] = useState<DiscordAuthUser | null>(() => getStoredDiscordUser());
   const [isDiscordSecurityOpen, setIsDiscordSecurityOpen] = useState(false);
 
-  // Discord-Style Security Regimen Handlers
+  // Google-only account and private Google Drive backup handlers.
   const handleDiscordUserChange = async (user: DiscordAuthUser | null) => {
     setDiscordUser(user);
     setStoredDiscordUser(user);
-    if (user) {
-      try {
-        const res = await fetch(getApiUrl(`/api/sync/load?userId=account_${user.id}`));
-        const data = await res.json();
-        if (data?.data?.supplements && Array.isArray(data.data.supplements) && data.data.supplements.length > 0) {
-          setSupplements(data.data.supplements);
-          saveSupplements(data.data.supplements);
-          if (data.data.logs) {
-            setLogs(data.data.logs);
-            saveDoseLogs(data.data.logs);
-          }
-          setToastMessage(`Logged in! Loaded ${data.data.supplements.length} supplement regimens.`);
-          return;
+    if (!user) {
+      setToastMessage('Signed out.');
+      return;
+    }
+    try {
+      const backup = await loadPrivateDriveBackup<{
+        supplements?: Supplement[];
+        logs?: DoseLog[];
+        profiles?: UserProfile[];
+        activeProfileId?: string;
+        dismissedDoses?: string[];
+      }>();
+      if (backup) {
+        if (Array.isArray(backup.supplements)) {
+          setSupplements(backup.supplements);
+          saveSupplements(backup.supplements);
         }
-      } catch (err) {
-        console.warn('Could not load user data:', err);
+        if (Array.isArray(backup.logs)) {
+          setLogs(backup.logs);
+          saveDoseLogs(backup.logs);
+        }
+        if (Array.isArray(backup.profiles) && backup.profiles.length) {
+          setProfiles(backup.profiles);
+          saveProfiles(backup.profiles);
+        }
+        if (backup.activeProfileId) {
+          setActiveProfileId(backup.activeProfileId);
+          saveActiveProfileId(backup.activeProfileId);
+        }
+        setToastMessage('Your private backup was restored from Google Drive.');
+      } else {
+        setToastMessage('Google sign-in complete. No existing Google Drive backup was found; your current device data is unchanged.');
       }
-      setToastMessage(`Signed in as ${user.displayName || user.email}. Cloud sync is disabled for privacy; your current device data remains local.`);
-    } else {
-      setToastMessage('Signed out of account.');
+    } catch (err: any) {
+      setToastMessage(err?.message || 'Could not restore from Google Drive. Please sign in again.');
     }
   };
 
@@ -134,28 +151,21 @@ export default function App() {
     if (!discordUser) return;
     setIsSyncing(true);
     try {
-      const payload: CloudRegimenData = {
+      await savePrivateDriveBackup({
         version: 1,
         appName: 'Supple Pulse',
         updatedAt: new Date().toISOString(),
-        userEmail: discordUser.email,
         supplements,
         logs,
+        profiles,
+        activeProfileId,
         dismissedDoses,
-      };
-      const response = await fetch(getApiUrl('/api/sync/save'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: `account_${discordUser.id}`, payload }),
       });
-      if (!response.ok) {
-        setToastMessage('Cloud backup is disabled while privacy protections are being upgraded. Your data has not been uploaded.');
-        return;
-      }
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setLastSyncedTime(timeStr);
-    } catch (e) {
-      console.warn('Sync failed:', e);
+      setToastMessage('Backup saved to your Google Drive private app-data area.');
+    } catch (e: any) {
+      setToastMessage(e?.message || 'Google Drive backup failed. Please sign in again.');
     } finally {
       setIsSyncing(false);
     }
@@ -165,28 +175,36 @@ export default function App() {
     if (!discordUser) return;
     setIsSyncing(true);
     try {
-      const res = await fetch(getApiUrl(`/api/sync/load?userId=account_${discordUser.id}`));
-      const data = await res.json();
-      if (res.status === 410 || data?.code === 'CLOUD_SYNC_DISABLED') {
-        setToastMessage('Cloud restore is disabled for privacy. Your device data has not been changed.');
+      const backup = await loadPrivateDriveBackup<{
+        supplements?: Supplement[];
+        logs?: DoseLog[];
+        profiles?: UserProfile[];
+        activeProfileId?: string;
+      }>();
+      if (!backup) {
+        setToastMessage('No Supple Pulse backup was found in this Google account.');
         return;
       }
-      if (!res.ok) throw new Error(data?.error || 'Cloud restore failed');
-      if (data?.data?.supplements) {
-        setSupplements(data.data.supplements);
-        saveSupplements(data.data.supplements);
-        if (data.data.logs) {
-          setLogs(data.data.logs);
-          saveDoseLogs(data.data.logs);
-        }
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setLastSyncedTime(timeStr);
-        setToastMessage(`Restored ${data.data.supplements.length} supplements from cloud!`);
-      } else {
-        setToastMessage('No backup found yet for this account. Click Back Up Now to save.');
+      if (Array.isArray(backup.supplements)) {
+        setSupplements(backup.supplements);
+        saveSupplements(backup.supplements);
       }
-    } catch (e) {
-      console.warn('Restore failed:', e);
+      if (Array.isArray(backup.logs)) {
+        setLogs(backup.logs);
+        saveDoseLogs(backup.logs);
+      }
+      if (Array.isArray(backup.profiles) && backup.profiles.length) {
+        setProfiles(backup.profiles);
+        saveProfiles(backup.profiles);
+      }
+      if (backup.activeProfileId) {
+        setActiveProfileId(backup.activeProfileId);
+        saveActiveProfileId(backup.activeProfileId);
+      }
+      setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      setToastMessage('Your supplement stash was restored from Google Drive.');
+    } catch (e: any) {
+      setToastMessage(e?.message || 'Google Drive restore failed. Please sign in again.');
     } finally {
       setIsSyncing(false);
     }

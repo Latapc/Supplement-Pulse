@@ -95,40 +95,125 @@ export async function signInWithGoogle(): Promise<{ user: User; accessToken: str
   }
 }
 
-/** Google Drive private app-data backup. The server never receives this payload. */
-export async function savePrivateDriveBackup(payload: unknown): Promise<void> {
+/**
+ * Encrypt backup data in the browser with a user-held passphrase before it reaches Drive.
+ * The passphrase and derived key are never persisted or sent to any server.
+ */
+const BACKUP_FILE_NAME = 'supple-pulse-private-backup.json';
+const BACKUP_ITERATIONS = 310000;
+
+function requirePassphrase(passphrase: string): void {
+  if (typeof passphrase !== 'string' || passphrase.length < 12) {
+    throw new Error('Use a backup passphrase of at least 12 characters. Keep it somewhere safe; it cannot be recovered for you.');
+  }
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+
+function fromBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function deriveBackupKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(passphrase),
+    'PBKDF2',
+    false,
+    ['deriveKey'],
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: BACKUP_ITERATIONS, hash: 'SHA-256' },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+
+async function encryptBackup(payload: unknown, passphrase: string): Promise<string> {
+  requirePassphrase(passphrase);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveBackupKey(passphrase, salt);
+  const plaintext = new TextEncoder().encode(JSON.stringify(payload));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+  return JSON.stringify({
+    format: 'supple-pulse-encrypted-backup',
+    version: 1,
+    kdf: 'PBKDF2-SHA256',
+    iterations: BACKUP_ITERATIONS,
+    cipher: 'AES-256-GCM',
+    salt: toBase64(salt),
+    iv: toBase64(iv),
+    ciphertext: toBase64(new Uint8Array(ciphertext)),
+  });
+}
+
+async function decryptBackup<T>(raw: unknown, passphrase: string): Promise<T> {
+  requirePassphrase(passphrase);
+  const envelope = raw as any;
+  if (!envelope || envelope.format !== 'supple-pulse-encrypted-backup' ||
+      envelope.version !== 1 || envelope.kdf !== 'PBKDF2-SHA256' ||
+      envelope.cipher !== 'AES-256-GCM' || typeof envelope.salt !== 'string' ||
+      typeof envelope.iv !== 'string' || typeof envelope.ciphertext !== 'string' ||
+      envelope.iterations !== BACKUP_ITERATIONS) {
+    throw new Error('This backup is not in the supported encrypted format. Create a new encrypted backup from the original device.');
+  }
+  try {
+    const key = await deriveBackupKey(passphrase, fromBase64(envelope.salt));
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: fromBase64(envelope.iv) },
+      key,
+      fromBase64(envelope.ciphertext),
+    );
+    return JSON.parse(new TextDecoder().decode(plaintext)) as T;
+  } catch {
+    throw new Error('Could not decrypt this backup. Check the passphrase and try again.');
+  }
+}
+
+/** Google Drive stores only authenticated ciphertext; no backup plaintext or passphrase is sent to the server. */
+export async function savePrivateDriveBackup(payload: unknown, passphrase: string): Promise<void> {
   if (!cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
+  const encryptedText = await encryptBackup(payload, passphrase);
   const headers = { Authorization: `Bearer ${cachedDriveAccessToken}` };
   const listRes = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name)', { headers });
   if (!listRes.ok) throw new Error(`Google Drive lookup failed (${listRes.status}). Please sign in again.`);
   const list = await listRes.json();
-  const existing = (list.files || []).find((file: any) => file.name === 'supple-pulse-private-backup.json');
-  const metadata = { name: 'supple-pulse-private-backup.json', ...(existing ? {} : { parents: ['appDataFolder'] }) };
+  const existing = (list.files || []).find((file: any) => file.name === BACKUP_FILE_NAME);
+  const metadata = { name: BACKUP_FILE_NAME, ...(existing ? {} : { parents: ['appDataFolder'] }) };
   const body = new FormData();
   body.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  body.append('file', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+  body.append('file', new Blob([encryptedText], { type: 'application/json' }));
   const url = existing
     ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(existing.id)}?uploadType=multipart`
     : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-  const res = await fetch(url, {
-    method: existing ? 'PATCH' : 'POST',
-    headers,
-    body,
-  });
+  const res = await fetch(url, { method: existing ? 'PATCH' : 'POST', headers, body });
   if (!res.ok) throw new Error(`Google Drive backup failed (${res.status}).`);
 }
 
-export async function loadPrivateDriveBackup<T>(): Promise<T | null> {
+export async function loadPrivateDriveBackup<T>(passphrase: string): Promise<T | null> {
   if (!cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
   const headers = { Authorization: `Bearer ${cachedDriveAccessToken}` };
   const listRes = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name)', { headers });
   if (!listRes.ok) throw new Error(`Google Drive lookup failed (${listRes.status}). Please sign in again.`);
   const list = await listRes.json();
-  const file = (list.files || []).find((item: any) => item.name === 'supple-pulse-private-backup.json');
+  const file = (list.files || []).find((item: any) => item.name === BACKUP_FILE_NAME);
   if (!file) return null;
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.id)}?alt=media`, { headers });
   if (!res.ok) throw new Error(`Google Drive restore failed (${res.status}).`);
-  return await res.json() as T;
+  const encryptedText = await res.text();
+  let envelope: unknown;
+  try { envelope = JSON.parse(encryptedText); } catch {
+    throw new Error('The Drive backup is not valid encrypted backup data.');
+  }
+  return decryptBackup<T>(envelope, passphrase);
 }
 
 /**

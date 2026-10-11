@@ -363,8 +363,12 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
   const handleGoogleOneTapSignIn = async () => {
     setIsLoading(true);
     setErrorMsg(null);
+
     try {
-      const { user: gUser } = await signInWithGoogleCalendar();
+      // Account sign-in must request identity scopes only. Calendar permissions
+      // are requested separately, only when the user explicitly connects Calendar.
+      const { user: gUser } = await signInWithGoogle();
+
       if (gUser) {
         const clientIp = currentIp || (await getClientIp());
         const authedUser: DiscordAuthUser = {
@@ -374,16 +378,30 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
           authorizedIps: [clientIp],
           currentIp: clientIp,
         };
+
         onUserChange(authedUser);
-        setSuccessMsg(`Welcome, ${gUser.displayName || gUser.email}! 1-Tap Google Sign-In verified.`);
+        setSuccessMsg(`Welcome, ${gUser.displayName || gUser.email}! Google sign-in succeeded.`);
         setTimeout(() => {
           setSuccessMsg(null);
           onClose();
         }, 1200);
       }
     } catch (err: any) {
-      if (err?.code !== 'auth/popup-closed-by-user') {
-        setErrorMsg(err?.message || 'Google 1-Tap sign-in failed. Please try again.');
+      const code = String(err?.code || '');
+      const message = String(err?.message || '');
+
+      if (code === 'auth/popup-closed-by-user') {
+        // Closing the Google window is not an error that needs to be shown.
+      } else if (code === 'auth/unauthorized-domain') {
+        setErrorMsg('Google sign-in is not configured for this app domain. The app owner must add the current domain in Firebase Console → Authentication → Settings → Authorized domains.');
+      } else if (code === 'auth/operation-not-allowed') {
+        setErrorMsg('Google sign-in is disabled for this Firebase project. The app owner must enable Google under Firebase Console → Authentication → Sign-in method.');
+      } else if (code === 'auth/popup-blocked') {
+        setErrorMsg('The browser blocked the Google sign-in window. Allow sign-in pop-ups for this site, then try again.');
+      } else if (message.includes('access_denied') || code === 'auth/internal-error') {
+        setErrorMsg('Google blocked this sign-in request. This attempt now requests only basic profile and email access, not Calendar access. If Google still blocks it, the project owner must check Google Auth Platform → Audience/Test users and the OAuth publishing status.');
+      } else {
+        setErrorMsg(message || 'Google sign-in failed. Please try again.');
       }
     } finally {
       setIsLoading(false);

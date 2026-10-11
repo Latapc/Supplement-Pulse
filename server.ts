@@ -14,6 +14,21 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Remove legacy server-side account/IP/password records and the old shared sync
+// database. The app now uses Google identity and each user's private Drive app-data.
+for (const legacyFile of [
+  path.join(process.cwd(), 'data', 'users_auth_db.json'),
+  path.join(process.cwd(), 'data', 'security_emails.json'),
+  path.join(process.cwd(), 'data', 'user_sync_db.json'),
+]) {
+  try {
+    if (fs.existsSync(legacyFile)) fs.unlinkSync(legacyFile);
+  } catch (err) {
+    console.error('Could not remove legacy private-data file:', path.basename(legacyFile), err);
+  }
+}
+
+
 // Enable CORS for Android APK (Capacitor https://localhost) and external clients
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');

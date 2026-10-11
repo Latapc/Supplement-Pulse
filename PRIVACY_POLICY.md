@@ -11,10 +11,11 @@ Supple Pulse ("we", "us", or "our") is a supplement and wellness tracking applic
 
 Depending on the features you choose to use, Supple Pulse may process:
 
-- **Account information:** email address, display name, account identifier, and authentication status when you sign in with Google or use the app's email-and-password account feature.
-- **Account security information:** IP address, login time, browser/device user-agent information, authorized IP addresses, and email-verification or login-verification records. These may be used to protect accounts and detect unfamiliar sign-ins.
+- **Account information:** email address, display name, account identifier, and authentication status when you sign in with Google and Google Drive app-data access when you authorize backup/restore.
+- **Account security information:** Google/Firebase authentication identifiers and technical security logs. The current Google-only sign-in flow is designed not to maintain a separate Supple Pulse password or IP allowlist.
 - **Supplement and wellness records:** supplements you enter, dose amounts and schedules, notes, planned intake times, and dose/adherence logs. These records may reveal information about your health, so please do not enter information you do not want processed.
-- **Google Calendar information:** if you deliberately connect Google Calendar, the app requests permission to create or update calendar events for supplement schedules. The app may receive an access token to perform those actions. If you do not connect Calendar, the app should not need Calendar access for ordinary account sign-in.
+- **Google Drive backup information:** if you choose backup/restore, the app requests access to its private Google Drive app-data area and stores your supplement schedules, dose logs, profiles, and related backup data there. This backup is stored in your Google account rather than the app's shared sync database. The app receives a temporary access token to perform the requested Drive operation; tokens are kept in memory, not deliberately saved to local storage.
+- **Google Calendar information:** if you deliberately connect Google Calendar, the app requests permission to create or update calendar events for supplement schedules. Calendar access is a separate feature.
 - **AI assistant content:** messages and relevant supplement/log information you submit to the in-app assistant may be sent to our configured AI service provider to generate a response.
 - **Technical and diagnostic information:** information included in requests, error logs, and hosting/security logs, as handled by the app and its service providers.
 
@@ -36,7 +37,7 @@ We do not intend the app to provide medical diagnosis or replace advice from a q
 
 ## 3. Google sign-in and Google Calendar
 
-Google sign-in is used to authenticate your account. Calendar integration is a separate feature that may request access to Google Calendar event data so that the app can create or update supplement reminders.
+Google sign-in is used to authenticate your account. When you authorize backup/restore, the app uses Google's Drive app-data area, which is separate from your ordinary Drive files and intended for app-specific data. The app's server is not intended to receive the supplement backup payload. Calendar integration is a separate feature that may request access to Google Calendar event data so that the app can create or update supplement reminders.
 
 You can decline Calendar permission and continue using features that do not require Calendar access. You can revoke the app's Google account access through your Google Account's third-party connections settings. Revoking access may stop Calendar syncing; it does not necessarily delete events already created in your calendar. You may need to remove those events separately.
 
@@ -51,6 +52,7 @@ If you use the in-app AI assistant, your prompt and relevant information you pro
 We may process or disclose information to service providers that operate features you request, such as:
 
 - **Google Firebase Authentication** for Google sign-in and authentication services;
+- **Google Drive API** when you back up or restore data in your private app-data area;
 - **Google Calendar API** when you enable Calendar syncing;
 - **Google Gemini / Google AI services** when you use AI features;
 - **hosting and infrastructure providers** that run the app or its server; and
@@ -62,20 +64,20 @@ We do not sell your personal information for money. We do not share information 
 
 We retain information for as long as reasonably necessary to provide the features you use, secure accounts, resolve disputes, comply with legal obligations, and enforce our agreements. Retention periods can differ by data type and service provider.
 
-Some account-security records, such as login-verification and email logs, may be stored by the app's server. Supplement records may be stored on your device or transmitted when you use syncing or AI features. Deleting the app may not delete information already sent to a server, an AI provider, or Google Calendar.
+The current design stores the explicit cloud backup in the user's Google Drive private app-data area, while the app may use browser storage as a local working cache. The app server is not intended to store the supplement backup. Information sent to AI features or Google Calendar is processed by those services. Deleting the app may not delete information already sent to a server, an AI provider, or Google Calendar.
 
 The app does not currently promise a self-service account deletion mechanism in this policy. To request deletion or ask what information may be held about you, contact **[PRIVACY CONTACT EMAIL]**. We may need to verify your request and may retain limited information where legally permitted or required.
 
 ## 7. Security
 
-We use technical and organizational measures intended to protect information. No internet transmission or storage system can be guaranteed completely secure. Please use a strong, unique password and keep your device and account credentials secure.
+We use technical and organizational measures intended to protect information. No internet transmission or storage system can be guaranteed completely secure. Keep your Google account secure and review the Google permissions you grant to the app.
 
 ## 8. Your choices and rights
 
 Depending on your location and applicable law, you may have rights to request access to, correction of, or deletion of personal information, or to object to or restrict certain processing.
 
 You can:
-- choose whether to use Google sign-in or the app's other available account method;
+- choose whether to sign in with Google;
 - decline or revoke Google Calendar permissions;
 - avoid sending optional information to the AI assistant; and
 - contact us to ask about access, correction, or deletion.

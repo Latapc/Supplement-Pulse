@@ -23,11 +23,12 @@ Last reviewed: 2026-10-11
 
 ## Required validation
 
-1. Run the production build and TypeScript checks.
-2. Test backup and restore on two devices using the same Google account and passphrase.
-3. Test wrong passphrases, missing backups, malformed backup files, and OAuth permission failures.
-4. Test two different Google accounts to confirm their Drive app-data areas are isolated.
-5. Audit local storage, logs, analytics, AI requests, and all server endpoints for unintended data exposure.
-6. Publish an accurate privacy policy with a real privacy contact and complete the applicable Google OAuth verification.
+1. Run the production build and TypeScript checks; no successful build has been confirmed for this change yet.
+2. Test automatic restore on a clean second device using only the same Google account.
+3. Test missing key files, malformed ciphertext, missing backups, and OAuth permission failures; confirm failures never overwrite the last known cloud copy.
+4. Test two different Google accounts and confirm their Drive app-data areas are isolated.
+5. Test offline edits, failed uploads, repeated sign-ins, account switching, and concurrent edits from two devices.
+6. Audit local storage, logs, analytics, AI requests, and all server endpoints for unintended data exposure.
+7. Publish an accurate privacy policy with a real privacy contact and complete the applicable Google OAuth verification.
 
 This document records the current implementation and known limitations; it is not a guarantee of security.

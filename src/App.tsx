@@ -104,50 +104,20 @@ export default function App() {
   const [discordUser, setDiscordUser] = useState<DiscordAuthUser | null>(() => getStoredDiscordUser());
   const [isDiscordSecurityOpen, setIsDiscordSecurityOpen] = useState(false);
 
-  // Google-only account and private Google Drive backup handlers.
+  // Google-only account and client-side encrypted Google Drive backups.
+  // Google sign-in alone never decrypts a backup: users must supply their separate passphrase.
   const handleDiscordUserChange = async (user: DiscordAuthUser | null) => {
     setDiscordUser(user);
     setStoredDiscordUser(user);
-    if (!user) {
-      setToastMessage('Signed out.');
-      return;
-    }
-    try {
-      const backup = await loadPrivateDriveBackup<{
-        supplements?: Supplement[];
-        logs?: DoseLog[];
-        profiles?: UserProfile[];
-        activeProfileId?: string;
-        dismissedDoses?: string[];
-      }>();
-      if (backup) {
-        if (Array.isArray(backup.supplements)) {
-          setSupplements(backup.supplements);
-          saveSupplements(backup.supplements);
-        }
-        if (Array.isArray(backup.logs)) {
-          setLogs(backup.logs);
-          saveDoseLogs(backup.logs);
-        }
-        if (Array.isArray(backup.profiles) && backup.profiles.length) {
-          setProfiles(backup.profiles);
-          saveProfiles(backup.profiles);
-        }
-        if (backup.activeProfileId) {
-          setActiveProfileId(backup.activeProfileId);
-          saveActiveProfileId(backup.activeProfileId);
-        }
-        setToastMessage('Your private backup was restored from Google Drive.');
-      } else {
-        setToastMessage('Google sign-in complete. No existing Google Drive backup was found; your current device data is unchanged.');
-      }
-    } catch (err: any) {
-      setToastMessage(err?.message || 'Could not restore from Google Drive. Please sign in again.');
-    }
+    setToastMessage(user
+      ? 'Signed in with Google. To restore your encrypted stash, choose Restore backup and enter your backup passphrase.'
+      : 'Signed out of Google.');
   };
 
   const handleDiscordSyncRegimen = async () => {
     if (!discordUser) return;
+    const passphrase = window.prompt('Create or enter your backup passphrase (at least 12 characters). You must remember it to restore on another device. It is never saved.');
+    if (passphrase === null) return;
     setIsSyncing(true);
     try {
       await savePrivateDriveBackup({
@@ -159,12 +129,12 @@ export default function App() {
         profiles,
         activeProfileId,
         dismissedDoses,
-      });
+      }, passphrase);
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setLastSyncedTime(timeStr);
-      setToastMessage('Backup saved to your Google Drive private app-data area.');
+      setToastMessage('Encrypted backup saved to Google Drive. Only the encrypted file was uploaded; keep your passphrase safe.');
     } catch (e: any) {
-      setToastMessage(e?.message || 'Google Drive backup failed. Please sign in again.');
+      setToastMessage(e?.message || 'Encrypted Google Drive backup failed. Please sign in again.');
     } finally {
       setIsSyncing(false);
     }
@@ -172,6 +142,8 @@ export default function App() {
 
   const handleDiscordRestoreRegimen = async () => {
     if (!discordUser) return;
+    const passphrase = window.prompt('Enter the backup passphrase you used when creating the encrypted backup. It is not your Google password.');
+    if (passphrase === null) return;
     setIsSyncing(true);
     try {
       const backup = await loadPrivateDriveBackup<{
@@ -179,7 +151,8 @@ export default function App() {
         logs?: DoseLog[];
         profiles?: UserProfile[];
         activeProfileId?: string;
-      }>();
+        dismissedDoses?: Record<string, string[]>;
+      }>(passphrase);
       if (!backup) {
         setToastMessage('No Supple Pulse backup was found in this Google account.');
         return;
@@ -200,63 +173,16 @@ export default function App() {
         setActiveProfileId(backup.activeProfileId);
         saveActiveProfileId(backup.activeProfileId);
       }
+      if (backup.dismissedDoses) setDismissedDoses(backup.dismissedDoses);
       setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      setToastMessage('Your supplement stash was restored from Google Drive.');
+      setToastMessage('Your encrypted supplement stash was decrypted on this device and restored.');
     } catch (e: any) {
-      setToastMessage(e?.message || 'Google Drive restore failed. Please sign in again.');
+      setToastMessage(e?.message || 'Encrypted Google Drive restore failed. Check the passphrase and try again.');
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const activeProfile = useMemo(() => {
-    return profiles.find((p) => p.id === activeProfileId) || profiles[0] || INITIAL_PROFILES[0];
-  }, [profiles, activeProfileId]);
-
-  const profileMap = useMemo(() => {
-    const map = new Map<string, UserProfile>();
-    profiles.forEach((p) => map.set(p.id, p));
-    return map;
-  }, [profiles]);
-
-  const handleSelectProfile = (id: string) => {
-    setActiveProfileId(id);
-    saveActiveProfileId(id);
-    triggerHaptic('light');
-    const p = profiles.find((item) => item.id === id);
-    setToastMessage(`Switched profile to ${p?.name || 'User'} (${p?.relation || ''})`);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  const handleSaveProfiles = (newProfiles: UserProfile[]) => {
-    setProfiles(newProfiles);
-    saveProfiles(newProfiles);
-  };
-
-  const handleDeleteProfile = (profileId: string) => {
-    const updated = profiles.filter((p) => p.id !== profileId);
-    setProfiles(updated);
-    saveProfiles(updated);
-    if (activeProfileId === profileId) {
-      setActiveProfileId('profile_self');
-      saveActiveProfileId('profile_self');
-    }
-    setToastMessage('Profile deleted.');
-    setTimeout(() => setToastMessage(null), 2500);
-  };
-
-  const handleOpenSpecialChat = (prompt?: string) => {
-    setChatSpecialMode(true);
-    setChatInitialPrompt(prompt || 'Boron 6 mg: take every day for 2 weeks, then break for 1 week, repeat for life');
-    setIsChatOpen(true);
-  };
-
-  const handleOpenStandardChat = () => {
-    setChatSpecialMode(false);
-    setChatInitialPrompt(undefined);
-    setIsChatOpen(true);
-  };
-  
   // Real-time clock for live countdowns (updates every 10 seconds)
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   

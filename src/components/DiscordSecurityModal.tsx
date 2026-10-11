@@ -95,7 +95,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button disabled={loading} onClick={() => runBackupAction(onSyncRegimen)} className="flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50"><CloudUpload size={18} /> Back up to Drive</button>
-              <button disabled={loading} onClick={() => runBackupAction(onRestoreRegimen)} className="flex items-center justify-center gap-2 rounded-xl border border-white/15 px-4 py-3 font-semibold hover:bg-white/10 disabled:opacity-50"><CloudDownload size={18} /> Restore backup</button>
+              <button disabled={loading} onClick={() => runBackupAction(onRestoreRegimen)} className="flex items-center justify-center gap-2 rounded-xl border border-white/15 px-4 py-3 font-semibold hover:bg-white/10 disabled:opacity-50"><CloudDownload size={18} /> Reload from Drive</button>
             </div>
             <button disabled={loading} onClick={handleSignOut} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm text-slate-300 hover:bg-white/10 disabled:opacity-50"><LogOut size={17} /> Sign out</button>
           </>

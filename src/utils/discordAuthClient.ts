@@ -37,6 +37,13 @@ const LOCAL_STORAGE_USER_KEY = 'supplepulse_discord_auth_user';
 const LOCAL_STORAGE_ACCOUNTS_KEY = 'supplepulse_local_accounts';
 const LOCAL_STORAGE_EMAILS_KEY = 'supplepulse_security_emails';
 
+// Purge credentials and IP/security-mailbox data left by the retired password login.
+try {
+  localStorage.removeItem(LOCAL_STORAGE_ACCOUNTS_KEY);
+  localStorage.removeItem(LOCAL_STORAGE_EMAILS_KEY);
+  localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+} catch {}
+
 // Local storage helpers
 function getLocalAccounts(): StoredAccount[] {
   try {

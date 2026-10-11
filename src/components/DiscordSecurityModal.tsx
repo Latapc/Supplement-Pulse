@@ -84,7 +84,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
         </div>
 
         <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-slate-300">
-          Your backup is stored in Google Drive's private app-data area, not in Supple Pulse's cloud database. Google sign-in asks for access to that private app-data area so this app can restore your stash on another device.
+          Backups are encrypted on your device with AES-256-GCM before upload. A separate passphrase derives the encryption key and is never saved or sent to Supple Pulse. You need the same passphrase to restore on another device. Google sign-in alone cannot decrypt the backup.
         </div>
 
         {currentUser ? (
@@ -108,7 +108,7 @@ export const DiscordSecurityModal: React.FC<DiscordSecurityModalProps> = ({
         {loading && <p className="mt-4 text-center text-sm text-slate-400">Please wait…</p>}
         {error && <p role="alert" className="mt-4 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{error}</p>}
         {message && <p role="status" className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-200">{message}</p>}
-        <p className="mt-5 text-xs leading-5 text-slate-500">Google Drive access must be approved by the user. Google may require OAuth verification before this app can be used publicly. Your local device storage is not automatically erased by signing out.</p>
+        <p className="mt-5 text-xs leading-5 text-slate-500">Keep your backup passphrase safe. If you lose it, the encrypted backup cannot be recovered by Supple Pulse. Backups are manual; local working data remains on this device. Google may require OAuth verification before public use.</p>
       </section>
     </div>
   );

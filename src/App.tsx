@@ -366,37 +366,6 @@ export default function App() {
   // Account Security & Cloud Sync State
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
-  const autoSyncTimeoutRef = useRef<any>(null);
-  const isFirstLoadRef = useRef<boolean>(true);
-
-  // Auto-sync debounced effect: automatically sync changes to encrypted cloud when signed in
-  useEffect(() => {
-    if (isFirstLoadRef.current) {
-      isFirstLoadRef.current = false;
-      return;
-    }
-    if (!discordUser) return;
-
-    if (autoSyncTimeoutRef.current) {
-      clearTimeout(autoSyncTimeoutRef.current);
-    }
-
-    autoSyncTimeoutRef.current = setTimeout(async () => {
-      try {
-        await handleDiscordSyncRegimen();
-        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      } catch (e) {
-        console.warn('Auto-sync error:', e);
-      }
-    }, 2500);
-
-    return () => {
-      if (autoSyncTimeoutRef.current) {
-        clearTimeout(autoSyncTimeoutRef.current);
-      }
-    };
-  }, [supplements, logs, dismissedDoses, discordUser]);
-
   // Calculate today's status for all supplements
   const todayDateStr = formatDateToYYYYMMDD(currentTime);
   const dismissedTodayIds = useMemo(() => dismissedDoses[todayDateStr] || [], [dismissedDoses, todayDateStr]);

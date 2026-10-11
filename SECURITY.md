@@ -13,7 +13,7 @@ Last reviewed: 2026-10-11
 
 ## Important limitations
 
-- Browser local storage remains the app's working cache and is **not encrypted by this backup feature**. Someone with access to the same unlocked browser profile/device may inspect it.
+- Browser local storage remains the app's working cache and is **not encrypted by this backup feature**. Someone with access to the same unlocked browser profile/device may inspect it. Cloud data is the cross-device copy; local cache is retained for compatibility and offline resilience.
 - Client-side backup encryption protects the Drive backup contents only. It does not protect data a user sends to optional AI features, Google Calendar, or other connected services.
 - A compromised device, malicious browser extension, injected client code, or a user entering the passphrase into a fake app could expose data or the passphrase.
 - A weak or reused passphrase may be vulnerable to guessing. Users should use a unique, hard-to-guess passphrase and keep it in a trusted password manager.

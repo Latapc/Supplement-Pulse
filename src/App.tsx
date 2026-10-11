@@ -39,8 +39,7 @@ import {
 import { 
   Supplement, 
   DoseLog, 
-  TodaySupplementStatus,
-  CloudRegimenData
+  TodaySupplementStatus
 } from './types/supplement';
 import { UserProfile, INITIAL_PROFILES } from './types/profile';
 import { 

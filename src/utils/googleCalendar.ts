@@ -295,6 +295,11 @@ export async function saveAutomaticDriveData(payload: unknown): Promise<void> {
   const user = auth.currentUser;
   if (!user || !cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
   const files = await listDriveAppDataFiles();
+  const hasDataFile = files.some((file) => file.name === AUTO_DATA_FILE_NAME);
+  const hasKeyFile = files.some((file) => file.name === AUTO_KEY_FILE_NAME);
+  if (hasDataFile && !hasKeyFile) {
+    throw new Error('A cloud backup exists but its encryption key is missing. Refusing to overwrite the existing backup.');
+  }
   const key = await getOrCreateAutomaticKey(user.uid, files);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));

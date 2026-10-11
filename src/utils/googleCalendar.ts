@@ -20,8 +20,10 @@ export const CALENDAR_SCOPES = [
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Provider for standard user authentication (NO sensitive calendar scopes)
-// This will NEVER trigger Google unverified app warnings or Error 403: access_denied
+// Provider for account authentication (identity scopes only).
+// Keep Calendar API scopes on calendarProvider so normal sign-in does not request
+// access to a user's calendar. Google Cloud consent-screen, audience, Firebase
+// provider, or authorized-domain settings can still prevent authentication.
 const authProvider = new GoogleAuthProvider();
 authProvider.setCustomParameters({
   prompt: 'select_account',

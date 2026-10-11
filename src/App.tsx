@@ -46,8 +46,8 @@ import {
   syncSupplementToGoogleCalendar, 
   deleteSupplementCalendarEvent, 
   isGoogleCalendarConnected,
-  savePrivateDriveBackup,
-  loadPrivateDriveBackup
+  saveAutomaticDriveData,
+  loadAutomaticDriveData
 } from './utils/googleCalendar';
 import { 
   loadSupplements, 
@@ -104,24 +104,128 @@ export default function App() {
   const [discordUser, setDiscordUser] = useState<DiscordAuthUser | null>(() => getStoredDiscordUser());
   const [isDiscordSecurityOpen, setIsDiscordSecurityOpen] = useState(false);
 
-  // Google-only account and client-side encrypted Google Drive backups.
-  // Google sign-in alone never decrypts a backup: users must supply their separate passphrase.
+  // Google account data is restored automatically from Drive. The cloud key is
+  // recoverable through the same account, so no separate passphrase is required.
+  const [cloudReady, setCloudReady] = useState(false);
+  const cloudSyncUidRef = useRef<string | null>(null);
+
   const handleDiscordUserChange = async (user: DiscordAuthUser | null) => {
+    setCloudReady(false);
     setDiscordUser(user);
     setStoredDiscordUser(user);
-    setToastMessage(user
-      ? 'Signed in with Google. To restore your encrypted stash, choose Restore backup and enter your backup passphrase.'
-      : 'Signed out of Google.');
+
+    if (!user) {
+      cloudSyncUidRef.current = null;
+      setSupplements([]);
+      setLogs([]);
+      setProfiles(INITIAL_PROFILES);
+      setActiveProfileId(INITIAL_PROFILES[0]?.id || 'profile_self');
+      setDismissedDoses({});
+      try {
+        localStorage.removeItem('suppletrack_supplements_v1');
+        localStorage.removeItem('suppletrack_logs_v1');
+        localStorage.removeItem('suppletrack_profiles_v1');
+        localStorage.removeItem('suppletrack_active_profile_v1');
+        localStorage.removeItem('suppletrack_dismissed_doses_v1');
+      } catch {}
+      setToastMessage('Signed out of Google. Private data was cleared from this app session.');
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const backup = await loadAutomaticDriveData<{
+        supplements?: Supplement[];
+        logs?: DoseLog[];
+        profiles?: UserProfile[];
+        activeProfileId?: string;
+        dismissedDoses?: Record<string, string[]>;
+      }>();
+
+      if (backup) {
+        if (Array.isArray(backup.supplements)) {
+          setSupplements(backup.supplements);
+          saveSupplements(backup.supplements);
+        }
+        if (Array.isArray(backup.logs)) {
+          setLogs(backup.logs);
+          saveDoseLogs(backup.logs);
+        }
+        if (Array.isArray(backup.profiles) && backup.profiles.length) {
+          setProfiles(backup.profiles);
+          saveProfiles(backup.profiles);
+        }
+        if (backup.activeProfileId) {
+          setActiveProfileId(backup.activeProfileId);
+          saveActiveProfileId(backup.activeProfileId);
+        }
+        if (backup.dismissedDoses) {
+          setDismissedDoses(backup.dismissedDoses);
+          localStorage.setItem('suppletrack_dismissed_doses_v1', JSON.stringify(backup.dismissedDoses));
+        }
+        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        setToastMessage('Your data was restored automatically from Google Drive.');
+      } else {
+        // First sign-in: preserve existing local data as a one-time migration.
+        // If this is a fresh device, the app's starter data is uploaded instead.
+        await saveAutomaticDriveData({
+          version: 2,
+          appName: 'Supple Pulse',
+          updatedAt: new Date().toISOString(),
+          supplements,
+          logs,
+          profiles,
+          activeProfileId,
+          dismissedDoses,
+        });
+        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        setToastMessage('Your data is now backed up to your Google account.');
+      }
+      cloudSyncUidRef.current = user.id;
+      setCloudReady(true);
+    } catch (e: any) {
+      cloudSyncUidRef.current = null;
+      setToastMessage(e?.message || 'Could not load your Google Drive data. Your current data was not overwritten.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
+
+  // Keep an encrypted Drive copy up to date after edits. The current local cache
+  // remains for compatibility/offline resilience; Drive is the cross-device copy.
+  useEffect(() => {
+    if (!discordUser || !cloudReady || cloudSyncUidRef.current !== discordUser.id) return;
+    const uid = discordUser.id;
+    const timer = window.setTimeout(async () => {
+      if (cloudSyncUidRef.current !== uid) return;
+      setIsSyncing(true);
+      try {
+        await saveAutomaticDriveData({
+          version: 2,
+          appName: 'Supple Pulse',
+          updatedAt: new Date().toISOString(),
+          supplements,
+          logs,
+          profiles,
+          activeProfileId,
+          dismissedDoses,
+        });
+        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      } catch (e: any) {
+        setToastMessage(e?.message || 'Cloud backup failed. Keep the app open and try again.');
+      } finally {
+        setIsSyncing(false);
+      }
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [discordUser, cloudReady, supplements, logs, profiles, activeProfileId, dismissedDoses]);
 
   const handleDiscordSyncRegimen = async () => {
     if (!discordUser) return;
-    const passphrase = window.prompt('Create or enter your backup passphrase (at least 12 characters). You must remember it to restore on another device. It is never saved.');
-    if (passphrase === null) return;
     setIsSyncing(true);
     try {
-      await savePrivateDriveBackup({
-        version: 1,
+      await saveAutomaticDriveData({
+        version: 2,
         appName: 'Supple Pulse',
         updatedAt: new Date().toISOString(),
         supplements,
@@ -129,12 +233,11 @@ export default function App() {
         profiles,
         activeProfileId,
         dismissedDoses,
-      }, passphrase);
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setLastSyncedTime(timeStr);
-      setToastMessage('Encrypted backup saved to Google Drive. Only the encrypted file was uploaded; keep your passphrase safe.');
+      });
+      setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      setToastMessage('Encrypted data saved to your Google Drive app data.');
     } catch (e: any) {
-      setToastMessage(e?.message || 'Encrypted Google Drive backup failed. Please sign in again.');
+      setToastMessage(e?.message || 'Google Drive save failed. Please sign in again.');
     } finally {
       setIsSyncing(false);
     }
@@ -142,45 +245,7 @@ export default function App() {
 
   const handleDiscordRestoreRegimen = async () => {
     if (!discordUser) return;
-    const passphrase = window.prompt('Enter the backup passphrase you used when creating the encrypted backup. It is not your Google password.');
-    if (passphrase === null) return;
-    setIsSyncing(true);
-    try {
-      const backup = await loadPrivateDriveBackup<{
-        supplements?: Supplement[];
-        logs?: DoseLog[];
-        profiles?: UserProfile[];
-        activeProfileId?: string;
-        dismissedDoses?: Record<string, string[]>;
-      }>(passphrase);
-      if (!backup) {
-        setToastMessage('No Supple Pulse backup was found in this Google account.');
-        return;
-      }
-      if (Array.isArray(backup.supplements)) {
-        setSupplements(backup.supplements);
-        saveSupplements(backup.supplements);
-      }
-      if (Array.isArray(backup.logs)) {
-        setLogs(backup.logs);
-        saveDoseLogs(backup.logs);
-      }
-      if (Array.isArray(backup.profiles) && backup.profiles.length) {
-        setProfiles(backup.profiles);
-        saveProfiles(backup.profiles);
-      }
-      if (backup.activeProfileId) {
-        setActiveProfileId(backup.activeProfileId);
-        saveActiveProfileId(backup.activeProfileId);
-      }
-      if (backup.dismissedDoses) setDismissedDoses(backup.dismissedDoses);
-      setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      setToastMessage('Your encrypted supplement stash was decrypted on this device and restored.');
-    } catch (e: any) {
-      setToastMessage(e?.message || 'Encrypted Google Drive restore failed. Check the passphrase and try again.');
-    } finally {
-      setIsSyncing(false);
-    }
+    await handleDiscordUserChange(discordUser);
   };
 
   // Real-time clock for live countdowns (updates every 10 seconds)

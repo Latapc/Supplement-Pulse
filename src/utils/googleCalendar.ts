@@ -216,6 +216,137 @@ export async function loadPrivateDriveBackup<T>(passphrase: string): Promise<T |
   return decryptBackup<T>(envelope, passphrase);
 }
 
+
+/**
+ * Automatic account-bound cloud storage.
+ *
+ * Convenience-first mode: a random AES-256 key is stored in a separate file in
+ * the same Google Drive appDataFolder as the encrypted data. This removes
+ * passphrase prompts and supports new-device recovery, but is NOT developer-blind
+ * encryption: anyone who can read both app-data files can decrypt the backup.
+ */
+const AUTO_DATA_FILE_NAME = 'supple-pulse-cloud-data-v2.json';
+const AUTO_KEY_FILE_NAME = 'supple-pulse-cloud-key-v2.json';
+
+type DriveFileMeta = { id: string; name: string };
+
+async function listDriveAppDataFiles(): Promise<DriveFileMeta[]> {
+  if (!cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
+  const res = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name)', {
+    headers: { Authorization: `Bearer ${cachedDriveAccessToken}` },
+  });
+  if (!res.ok) throw new Error(`Google Drive lookup failed (${res.status}). Please sign in again.`);
+  const json = await res.json();
+  return (json.files || []) as DriveFileMeta[];
+}
+
+async function readDriveAppDataFile(fileId: string): Promise<any> {
+  if (!cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${cachedDriveAccessToken}` },
+  });
+  if (!res.ok) throw new Error(`Google Drive download failed (${res.status}).`);
+  return res.json();
+}
+
+async function writeDriveAppDataFile(name: string, text: string, files: DriveFileMeta[]): Promise<void> {
+  if (!cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
+  const existing = files.find((file) => file.name === name);
+  const metadata = { name, ...(existing ? {} : { parents: ['appDataFolder'] }) };
+  const body = new FormData();
+  body.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  body.append('file', new Blob([text], { type: 'application/json' }));
+  const url = existing
+    ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(existing.id)}?uploadType=multipart`
+    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+  const res = await fetch(url, {
+    method: existing ? 'PATCH' : 'POST',
+    headers: { Authorization: `Bearer ${cachedDriveAccessToken}` },
+    body,
+  });
+  if (!res.ok) throw new Error(`Google Drive save failed (${res.status}).`);
+}
+
+async function getOrCreateAutomaticKey(uid: string, files: DriveFileMeta[]): Promise<CryptoKey> {
+  const keyFile = files.find((file) => file.name === AUTO_KEY_FILE_NAME);
+  if (keyFile) {
+    const stored = await readDriveAppDataFile(keyFile.id);
+    if (stored?.format !== 'supple-pulse-auto-key' || stored?.version !== 2 ||
+        stored?.uid !== uid || typeof stored?.key !== 'string') {
+      throw new Error('The cloud encryption key file is invalid or belongs to a different account.');
+    }
+    return crypto.subtle.importKey('raw', fromBase64(stored.key), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  }
+
+  const rawKey = crypto.getRandomValues(new Uint8Array(32));
+  const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  await writeDriveAppDataFile(AUTO_KEY_FILE_NAME, JSON.stringify({
+    format: 'supple-pulse-auto-key',
+    version: 2,
+    uid,
+    key: toBase64(rawKey),
+    createdAt: new Date().toISOString(),
+  }), files);
+  rawKey.fill(0);
+  return key;
+}
+
+export async function saveAutomaticDriveData(payload: unknown): Promise<void> {
+  const user = auth.currentUser;
+  if (!user || !cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
+  const files = await listDriveAppDataFiles();
+  const key = await getOrCreateAutomaticKey(user.uid, files);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify(payload));
+  const ciphertext = await crypto.subtle.encrypt({
+    name: 'AES-GCM',
+    iv,
+    additionalData: new TextEncoder().encode(user.uid),
+  }, key, plaintext);
+  const envelope = {
+    format: 'supple-pulse-cloud-data',
+    version: 2,
+    cipher: 'AES-256-GCM',
+    uid: user.uid,
+    iv: toBase64(iv),
+    ciphertext: toBase64(new Uint8Array(ciphertext)),
+    updatedAt: new Date().toISOString(),
+  };
+  await writeDriveAppDataFile(AUTO_DATA_FILE_NAME, JSON.stringify(envelope), files);
+}
+
+export async function loadAutomaticDriveData<T>(): Promise<T | null> {
+  const user = auth.currentUser;
+  if (!user || !cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
+  const files = await listDriveAppDataFiles();
+  const dataFile = files.find((file) => file.name === AUTO_DATA_FILE_NAME);
+  if (!dataFile) return null;
+  const keyFile = files.find((file) => file.name === AUTO_KEY_FILE_NAME);
+  if (!keyFile) throw new Error('The cloud backup exists but its encryption key is missing. The data was not overwritten.');
+  const storedKey = await readDriveAppDataFile(keyFile.id);
+  if (storedKey?.format !== 'supple-pulse-auto-key' || storedKey?.version !== 2 ||
+      storedKey?.uid !== user.uid || typeof storedKey?.key !== 'string') {
+    throw new Error('The cloud encryption key file is invalid or belongs to a different account.');
+  }
+  const key = await crypto.subtle.importKey('raw', fromBase64(storedKey.key), { name: 'AES-GCM' }, false, ['decrypt']);
+  const envelope = await readDriveAppDataFile(dataFile.id);
+  if (envelope?.format !== 'supple-pulse-cloud-data' || envelope?.version !== 2 ||
+      envelope?.cipher !== 'AES-256-GCM' || envelope?.uid !== user.uid ||
+      typeof envelope?.iv !== 'string' || typeof envelope?.ciphertext !== 'string') {
+    throw new Error('The cloud backup is invalid or belongs to a different account.');
+  }
+  try {
+    const plaintext = await crypto.subtle.decrypt({
+      name: 'AES-GCM',
+      iv: fromBase64(envelope.iv),
+      additionalData: new TextEncoder().encode(user.uid),
+    }, key, fromBase64(envelope.ciphertext));
+    return JSON.parse(new TextDecoder().decode(plaintext)) as T;
+  } catch {
+    throw new Error('The cloud backup could not be decrypted. The data was left unchanged.');
+  }
+}
+
 /**
  * Sign in to Google with Calendar scopes (specifically for Google Calendar API sync)
  */

@@ -16,6 +16,10 @@ export const CALENDAR_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
 ];
 
+// Google Drive appDataFolder is hidden from the user's normal Drive UI and
+// limits this app to files it creates in its own private app-data area.
+export const DRIVE_BACKUP_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+
 // Initialize Firebase App singleton safely
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -25,6 +29,7 @@ export const auth = getAuth(app);
 // access to a user's calendar. Google Cloud consent-screen, audience, Firebase
 // provider, or authorized-domain settings can still prevent authentication.
 const authProvider = new GoogleAuthProvider();
+authProvider.addScope(DRIVE_BACKUP_SCOPE);
 authProvider.setCustomParameters({
   prompt: 'select_account',
 });
@@ -38,6 +43,7 @@ calendarProvider.setCustomParameters({
 
 // In-memory token cache (NEVER in localStorage/sessionStorage per security requirements)
 let cachedAccessToken: string | null = null;
+let cachedDriveAccessToken: string | null = null;
 let isSigningIn = false;
 
 // Subscribers for auth state changes
@@ -62,6 +68,7 @@ function notifySubscribers() {
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     cachedAccessToken = null;
+    cachedDriveAccessToken = null;
   }
   notifySubscribers();
 });
@@ -71,18 +78,57 @@ onAuthStateChanged(auth, async (user) => {
  * Used for Account Authentication, 1-Tap Google Sign-In, and Cloud Sync.
  * Uses only basic identity scopes (profile, email) so it works seamlessly for ALL Google accounts without app verification blocks.
  */
-export async function signInWithGoogle(): Promise<{ user: User }> {
+export async function signInWithGoogle(): Promise<{ user: User; accessToken: string }> {
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, authProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (!credential?.accessToken) throw new Error('Google did not grant private Drive app-data access.');
+    cachedDriveAccessToken = credential.accessToken;
     notifySubscribers();
-    return { user: result.user };
+    return { user: result.user, accessToken: credential.accessToken };
   } catch (error: any) {
     console.error('Google account sign-in error:', error);
     throw error;
   } finally {
     isSigningIn = false;
   }
+}
+
+/** Google Drive private app-data backup. The server never receives this payload. */
+export async function savePrivateDriveBackup(payload: unknown): Promise<void> {
+  if (!cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
+  const headers = { Authorization: `Bearer ${cachedDriveAccessToken}` };
+  const listRes = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name)', { headers });
+  if (!listRes.ok) throw new Error(`Google Drive lookup failed (${listRes.status}). Please sign in again.`);
+  const list = await listRes.json();
+  const existing = (list.files || []).find((file: any) => file.name === 'supple-pulse-private-backup.json');
+  const metadata = { name: 'supple-pulse-private-backup.json', ...(existing ? {} : { parents: ['appDataFolder'] }) };
+  const body = new FormData();
+  body.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  body.append('file', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+  const url = existing
+    ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(existing.id)}?uploadType=multipart`
+    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+  const res = await fetch(url, {
+    method: existing ? 'PATCH' : 'POST',
+    headers,
+    body,
+  });
+  if (!res.ok) throw new Error(`Google Drive backup failed (${res.status}).`);
+}
+
+export async function loadPrivateDriveBackup<T>(): Promise<T | null> {
+  if (!cachedDriveAccessToken) throw new Error('Sign in with Google and grant private Drive access first.');
+  const headers = { Authorization: `Bearer ${cachedDriveAccessToken}` };
+  const listRes = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name)', { headers });
+  if (!listRes.ok) throw new Error(`Google Drive lookup failed (${listRes.status}). Please sign in again.`);
+  const list = await listRes.json();
+  const file = (list.files || []).find((item: any) => item.name === 'supple-pulse-private-backup.json');
+  if (!file) return null;
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.id)}?alt=media`, { headers });
+  if (!res.ok) throw new Error(`Google Drive restore failed (${res.status}).`);
+  return await res.json() as T;
 }
 
 /**

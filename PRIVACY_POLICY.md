@@ -106,3 +106,8 @@ Email: **[PRIVACY CONTACT EMAIL]**
 ---
 
 This policy describes the app's intended handling of information and should be checked against the deployed product, data flows, vendor settings, and applicable legal requirements before being presented as final.
+
+
+## Encrypted Google Drive backups
+
+When a user creates a backup, the app encrypts the backup in the browser using AES-256-GCM before uploading it to Google Drive's private app-data area. A key is derived from a separate user-chosen passphrase using PBKDF2-SHA-256 with a random salt and 310,000 iterations. A fresh random nonce is used for each encryption. The passphrase and derived key are not stored by Supple Pulse or sent to its server. Google sign-in by itself cannot decrypt backup contents. Users must remember the backup passphrase; Supple Pulse cannot recover it. Backups are manual and the app continues to keep working data in local browser storage. This encryption does not protect information a user chooses to send to optional AI features or other connected services.

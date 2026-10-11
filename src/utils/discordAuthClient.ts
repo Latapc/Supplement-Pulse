@@ -152,22 +152,13 @@ async function safeFetchJson(endpoint: string, options?: RequestInit): Promise<a
 }
 
 export function getStoredDiscordUser(): DiscordAuthUser | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  // Account state must come from a fresh Google sign-in, never a local identity cache.
+  return null;
 }
 
-export function setStoredDiscordUser(user: DiscordAuthUser | null) {
-  try {
-    if (user) {
-      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-    }
-  } catch {}
+export function setStoredDiscordUser(_user: DiscordAuthUser | null) {
+  // Remove legacy cached account identity; do not persist email, IPs, or auth state locally.
+  try { localStorage.removeItem(LOCAL_STORAGE_USER_KEY); } catch {}
 }
 
 export async function getClientIp(): Promise<string> {

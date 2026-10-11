@@ -4,7 +4,6 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
-import { createDiscordAuthRouter, handleVerifyIpHtml } from './server/discordAuth';
 
 dotenv.config();
 
@@ -661,9 +660,6 @@ app.delete('/api/sync/delete', (_req, res) => {
   });
 });
 
-// Discord-style Security & IP Authentication Endpoints
-app.use('/api/auth', createDiscordAuthRouter());
-app.get('/verify-ip', handleVerifyIpHtml);
 
 async function main() {
   const isProd = process.env.NODE_ENV === 'production';

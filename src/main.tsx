@@ -9,11 +9,20 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Register service worker for PWA offline functionality & installability
+// Service worker management: ensure active updates so mobile browsers never get stuck on stale precaches
 if ('serviceWorker' in navigator && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const reg of registrations) {
+      reg.update().catch(() => {});
+    }
+  });
+
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js', { scope: '/' })
+      .then((registration) => {
+        registration.update().catch(() => {});
+      })
       .catch(() => {
         // Silently handled in sandboxed preview iframe
       });

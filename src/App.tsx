@@ -77,7 +77,10 @@ import {
   CheckCircle2, 
   RotateCcw, 
   Sparkles,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Pill,
+  TrendingUp,
+  History
 } from 'lucide-react';
 
 export default function App() {
@@ -892,7 +895,7 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-28 sm:pb-8 space-y-8">
         
         {/* Toast Notification Alert */}
         {toastMessage && (
@@ -1177,6 +1180,73 @@ export default function App() {
         specialMode={chatSpecialMode}
         initialPrompt={chatInitialPrompt}
       />
+
+      {/* Mobile Sticky Bottom Navigation Bar for Instant 1-Tap Switching */}
+      <nav 
+        aria-label="Mobile Navigation" 
+        className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-stone-950/95 backdrop-blur-md border-t border-stone-200/90 dark:border-stone-800 px-2 py-1.5 flex items-center justify-around shadow-lg transition-colors"
+      >
+        <button
+          type="button"
+          onClick={() => setActiveTab('today')}
+          aria-current={activeTab === 'today' ? 'page' : undefined}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition cursor-pointer relative min-w-[64px] ${
+            activeTab === 'today'
+              ? 'text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50/80 dark:bg-emerald-950/50'
+              : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 font-medium'
+          }`}
+        >
+          <CalendarIcon className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Today</span>
+          {todayDueCount > 0 && (
+            <span className="absolute -top-1 right-2 px-1.5 py-0.2 min-w-[16px] h-4 rounded-full bg-emerald-600 text-white text-[9px] font-extrabold flex items-center justify-center shadow-xs">
+              {todayDueCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('supplements')}
+          aria-current={activeTab === 'supplements' ? 'page' : undefined}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition cursor-pointer min-w-[64px] ${
+            activeTab === 'supplements'
+              ? 'text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50/80 dark:bg-emerald-950/50'
+              : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 font-medium'
+          }`}
+        >
+          <Pill className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Stash</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('trends')}
+          aria-current={activeTab === 'trends' ? 'page' : undefined}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition cursor-pointer min-w-[64px] ${
+            activeTab === 'trends'
+              ? 'text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50/80 dark:bg-emerald-950/50'
+              : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 font-medium'
+          }`}
+        >
+          <TrendingUp className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Trends</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('history')}
+          aria-current={activeTab === 'history' ? 'page' : undefined}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition cursor-pointer min-w-[64px] ${
+            activeTab === 'history'
+              ? 'text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50/80 dark:bg-emerald-950/50'
+              : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 font-medium'
+          }`}
+        >
+          <History className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">History</span>
+        </button>
+      </nav>
 
     </div>
   );

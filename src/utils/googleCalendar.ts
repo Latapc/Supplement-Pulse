@@ -20,9 +20,17 @@ export const CALENDAR_SCOPES = [
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-const provider = new GoogleAuthProvider();
-CALENDAR_SCOPES.forEach((scope) => provider.addScope(scope));
-provider.setCustomParameters({
+// Provider for standard user authentication (NO sensitive calendar scopes)
+// This will NEVER trigger Google unverified app warnings or Error 403: access_denied
+const authProvider = new GoogleAuthProvider();
+authProvider.setCustomParameters({
+  prompt: 'select_account',
+});
+
+// Provider specifically for Google Calendar API event creation (requests sensitive calendar scope)
+const calendarProvider = new GoogleAuthProvider();
+CALENDAR_SCOPES.forEach((scope) => calendarProvider.addScope(scope));
+calendarProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
@@ -57,12 +65,31 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 /**
- * Sign in to Google with Calendar scopes
+ * Sign in to Google (Standard Authentication)
+ * Used for Account Authentication, 1-Tap Google Sign-In, and Cloud Sync.
+ * Uses only basic identity scopes (profile, email) so it works seamlessly for ALL Google accounts without app verification blocks.
+ */
+export async function signInWithGoogle(): Promise<{ user: User }> {
+  try {
+    isSigningIn = true;
+    const result = await signInWithPopup(auth, authProvider);
+    notifySubscribers();
+    return { user: result.user };
+  } catch (error: any) {
+    console.error('Google account sign-in error:', error);
+    throw error;
+  } finally {
+    isSigningIn = false;
+  }
+}
+
+/**
+ * Sign in to Google with Calendar scopes (specifically for Google Calendar API sync)
  */
 export async function signInWithGoogleCalendar(): Promise<{ user: User; accessToken: string }> {
   try {
     isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, calendarProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
       throw new Error('Failed to retrieve access token from Google sign in');
@@ -70,8 +97,22 @@ export async function signInWithGoogleCalendar(): Promise<{ user: User; accessTo
     cachedAccessToken = credential.accessToken;
     notifySubscribers();
     return { user: result.user, accessToken: cachedAccessToken };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Google Calendar sign-in error:', error);
+    // Detect Google verification / 403 access_denied on sensitive calendar scopes
+    if (
+      error?.code === 'auth/access_denied' ||
+      error?.code === 'auth/popup-closed-by-user' ||
+      error?.message?.includes('access_denied') ||
+      error?.message?.includes('verification')
+    ) {
+      const msg = error?.code === 'auth/popup-closed-by-user'
+        ? 'Sign-in popup was closed.'
+        : 'Google Calendar direct API access requires developer verification for this cloud project. You can still instantly sync your regimens using the 1-Click "Add to Google Calendar" web link or "Download .ics Calendar", which require zero permissions!';
+      const err = new Error(msg);
+      (err as any).code = error?.code || 'GOOGLE_CALENDAR_UNVERIFIED';
+      throw err;
+    }
     throw error;
   } finally {
     isSigningIn = false;
@@ -387,3 +428,72 @@ export function downloadICalFile(supplement: Supplement): void {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Generates an iCalendar (.ics) format file containing ALL active supplements
+ */
+export function generateAllICalData(supplements: Supplement[]): string {
+  const activeSupps = supplements.filter((s) => s.active);
+  const nowUtc = new Date().toISOString().replace(/-|:|\.\d\d\d/g, '');
+  const formatUtc = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, '');
+  const todayStr = formatDateToYYYYMMDD(new Date());
+
+  const eventBlocks = activeSupps.map((supplement) => {
+    const [hStr, mStr] = (supplement.doseTime || '09:00').split(':');
+    const hours = parseInt(hStr, 10) || 9;
+    const minutes = parseInt(mStr, 10) || 0;
+    const start = parseYYYYMMDD(
+      supplement.duration.startDate && supplement.duration.startDate >= todayStr
+        ? supplement.duration.startDate
+        : todayStr
+    );
+    start.setHours(hours, minutes, 0, 0);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + 15);
+    const rrule = buildRecurrenceRule(supplement)[0] || 'RRULE:FREQ=DAILY';
+
+    return [
+      'BEGIN:VEVENT',
+      `UID:supplepulse-${supplement.id}-${Date.now()}@suppletrack.app`,
+      `DTSTAMP:${nowUtc}`,
+      `DTSTART:${formatUtc(start)}`,
+      `DTEND:${formatUtc(end)}`,
+      `${rrule}`,
+      `SUMMARY:💊 Take ${supplement.name} (${supplement.doseAmount} ${supplement.unit})`,
+      `DESCRIPTION:Scheduled dose of ${supplement.name}. ${supplement.notes || ''} (Supple Pulse Protocol)`,
+      'BEGIN:VALARM',
+      'TRIGGER:-PT10M',
+      'ACTION:DISPLAY',
+      `DESCRIPTION:Reminder: Take ${supplement.name}`,
+      'END:VALARM',
+      'END:VEVENT',
+    ].join('\r\n');
+  });
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Supple Pulse//Regimen Tracker//EN',
+    'CALSCALE:GREGORIAN',
+    'X-WR-CALNAME:Supple Pulse Regimen',
+    ...eventBlocks,
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+/**
+ * Downloads a single .ics file containing all active supplements
+ */
+export function downloadAllSupplementsICalFile(supplements: Supplement[]): void {
+  const ics = generateAllICalData(supplements);
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'supple_pulse_all_regimens.ics');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+

@@ -1,0 +1,6 @@
+{
+  "summary":  "Comprehensive implementation plan for consolidating the calendar view exclusively inside Trends and Insights, placing the Account & Security button strictly in the mobile menu drawer, implementing 1-tap Google sign-in with direct calendar event links, and removing top-right clutter, fake email chips, and download instruction modals.",
+  "updatedAt":  "2026-10-10T10:15:46.670185175Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

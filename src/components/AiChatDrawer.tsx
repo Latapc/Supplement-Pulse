@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, 
   Send, 
@@ -296,13 +297,14 @@ export const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
     "Formulate an original Joint, Collagen & Tendon matrix protocol"
   ];
 
-  return (
-    <>
+  return typeof document !== 'undefined' ? createPortal(
+    <div className="fixed inset-0 z-[99999] isolate" role="dialog" aria-modal="true" aria-label="AI Coach Drawer">
       <div 
-        className="fixed inset-0 z-40 bg-stone-950/40 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white dark:bg-stone-900 shadow-2xl border-l border-stone-200 dark:border-stone-800 flex flex-col">
+      <div className="fixed inset-y-0 right-0 z-[100000] w-full max-w-md bg-white dark:bg-stone-900 shadow-2xl border-l border-stone-200 dark:border-stone-800 flex flex-col h-full animate-in slide-in-from-right duration-200 ease-out">
         {/* Header - Dr. Maya Pulse Persona */}
         <div className="p-4 border-b border-stone-200 dark:border-stone-800 bg-stone-900 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -555,6 +557,7 @@ export const AiChatDrawer: React.FC<AiChatDrawerProps> = ({
           </div>
         </form>
       </div>
-    </>
-  );
+    </div>,
+    document.body
+  ) : null;
 };

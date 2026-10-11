@@ -43,7 +43,7 @@ import {
   disableScreenshotProtection,
   getApiUrl
 } from '../utils/discordAuthClient';
-import { signInWithGoogleCalendar } from '../utils/googleCalendar';
+import { signInWithGoogle } from '../utils/googleCalendar';
 
 interface DiscordSecurityModalProps {
   isOpen: boolean;

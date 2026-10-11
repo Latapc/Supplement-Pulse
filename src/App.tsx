@@ -124,7 +124,7 @@ export default function App() {
       } catch (err) {
         console.warn('Could not load user data:', err);
       }
-      setToastMessage(`Signed in as ${user.displayName || user.email} (IP Verified)`);
+      setToastMessage(`Signed in as ${user.displayName || user.email}. Cloud sync is disabled for privacy; your current device data remains local.`);
     } else {
       setToastMessage('Signed out of account.');
     }
@@ -143,11 +143,15 @@ export default function App() {
         logs,
         dismissedDoses,
       };
-      await fetch(getApiUrl('/api/sync/save'), {
+      const response = await fetch(getApiUrl('/api/sync/save'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: `account_${discordUser.id}`, payload }),
       });
+      if (!response.ok) {
+        setToastMessage('Cloud backup is disabled while privacy protections are being upgraded. Your data has not been uploaded.');
+        return;
+      }
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setLastSyncedTime(timeStr);
     } catch (e) {
@@ -163,6 +167,11 @@ export default function App() {
     try {
       const res = await fetch(getApiUrl(`/api/sync/load?userId=account_${discordUser.id}`));
       const data = await res.json();
+      if (res.status === 410 || data?.code === 'CLOUD_SYNC_DISABLED') {
+        setToastMessage('Cloud restore is disabled for privacy. Your device data has not been changed.');
+        return;
+      }
+      if (!res.ok) throw new Error(data?.error || 'Cloud restore failed');
       if (data?.data?.supplements) {
         setSupplements(data.data.supplements);
         saveSupplements(data.data.supplements);

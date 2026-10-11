@@ -628,77 +628,37 @@ What physiological objective would you like me to reason through today?`,
   };
 }
 
-// File-backed user cloud backup storage for multi-user isolation
-const DATA_DIR = path.join(process.cwd(), 'data');
-const SYNC_DB_FILE = path.join(DATA_DIR, 'user_sync_db.json');
-const userCloudStores = new Map<string, any>();
-
-// Ensure directory exists
-try {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-} catch (e) {
-  console.warn('Could not initialize data directory in server.ts:', e);
-}
-
-// Load existing synced accounts on startup
-try {
-  if (fs.existsSync(SYNC_DB_FILE)) {
-    const raw = fs.readFileSync(SYNC_DB_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    Object.entries(parsed).forEach(([k, v]) => userCloudStores.set(k, v));
-  }
-} catch (e) {
-  console.warn('Failed to load user_sync_db.json:', e);
-}
-
-function persistSyncDb() {
-  try {
-    const dir = path.dirname(SYNC_DB_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    const obj: Record<string, any> = {};
-    userCloudStores.forEach((v, k) => {
-      obj[k] = v;
-    });
-    fs.writeFileSync(SYNC_DB_FILE, JSON.stringify(obj, null, 2), 'utf-8');
-  } catch (e) {
-    console.error('Failed to persist user_sync_db.json:', e);
-  }
-}
-
-app.post('/api/sync/save', (req, res) => {
-  const { userId, payload } = req.body;
-  if (!userId || !payload) {
-    return res.status(400).json({ error: 'userId and payload are required' });
-  }
-  const timestamp = new Date().toISOString();
-  userCloudStores.set(userId, {
-    ...payload,
-    savedAt: timestamp,
+// Privacy-first cloud sync lockdown.
+//
+// The previous endpoints accepted a caller-supplied userId without verifying an
+// authenticated session. Anyone who guessed or learned an ID could read,
+// overwrite, or delete that account's cloud data. Do not re-enable these routes
+// until authentication is enforced server-side and stored data is encrypted.
+//
+// Existing cloud-sync data is intentionally not loaded or exposed by this API.
+// The app's local browser storage continues to work on that device.
+app.post('/api/sync/save', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(410).json({
+    error: 'Cloud sync is temporarily disabled while account privacy is being secured.',
+    code: 'CLOUD_SYNC_DISABLED',
   });
-  persistSyncDb();
-  return res.json({ success: true, savedAt: timestamp });
 });
 
-app.get('/api/sync/load', (req, res) => {
-  const userId = req.query.userId as string;
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-  const data = userCloudStores.get(userId);
-  return res.json({ success: true, data: data || null });
+app.get('/api/sync/load', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(410).json({
+    error: 'Cloud sync is temporarily disabled while account privacy is being secured.',
+    code: 'CLOUD_SYNC_DISABLED',
+  });
 });
 
-app.delete('/api/sync/delete', (req, res) => {
-  const userId = req.query.userId as string;
-  if (userId) {
-    userCloudStores.delete(userId);
-    persistSyncDb();
-  }
-  return res.json({ success: true });
+app.delete('/api/sync/delete', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(410).json({
+    error: 'Cloud sync is temporarily disabled. Cloud data deletion must be handled securely by the operator.',
+    code: 'CLOUD_SYNC_DISABLED',
+  });
 });
 
 // Discord-style Security & IP Authentication Endpoints

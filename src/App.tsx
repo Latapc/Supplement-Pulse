@@ -27,14 +27,10 @@ import {
   ChatActionSnapshot 
 } from './components/AiChatDrawer';
 import { ProfileSwitcherModal } from './components/ProfileSwitcherModal';
-import { DiscordSecurityModal } from './components/DiscordSecurityModal';
-import { 
-  DiscordAuthUser, 
-  getStoredDiscordUser, 
-  setStoredDiscordUser,
-  getApiUrl,
-  disableScreenshotProtection
-} from './utils/discordAuthClient';
+import { CloudBackupModal } from './components/CloudBackupModal';
+import { GoogleUser } from './types/auth';
+import { getStoredGoogleUser, setStoredGoogleUser } from './utils/auth';
+import { scheduleUpcomingDoseAlarms } from './utils/notificationService';
 
 import { 
   Supplement, 
@@ -54,6 +50,7 @@ import {
   saveSupplements, 
   loadDoseLogs, 
   saveDoseLogs, 
+  initDoseLogs,
   loadProfiles,
   saveProfiles,
   loadActiveProfileId,
@@ -65,6 +62,11 @@ import {
   formatDateToYYYYMMDD, 
   calculateEndDate 
 } from './utils/dates';
+import { 
+  deductStockOnDose, 
+  restoreStockOnUndo, 
+  calculateStockDaysRemaining 
+} from './utils/inventory';
 import { 
   playChimeSound 
 } from './utils/audio';
@@ -101,34 +103,23 @@ export default function App() {
   const [profiles, setProfiles] = useState<UserProfile[]>(() => loadProfiles());
   const [activeProfileId, setActiveProfileId] = useState<string>(() => loadActiveProfileId());
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [discordUser, setDiscordUser] = useState<DiscordAuthUser | null>(() => getStoredDiscordUser());
-  const [isDiscordSecurityOpen, setIsDiscordSecurityOpen] = useState(false);
+  const [googleUser, setGoogleUser] = useState<GoogleUser | null>(() => getStoredGoogleUser());
+  const [isCloudBackupOpen, setIsCloudBackupOpen] = useState(false);
 
   // Google account data is restored automatically from Drive. The cloud key is
   // recoverable through the same account, so no separate passphrase is required.
   const [cloudReady, setCloudReady] = useState(false);
   const cloudSyncUidRef = useRef<string | null>(null);
 
-  const handleDiscordUserChange = async (user: DiscordAuthUser | null) => {
+  const handleGoogleUserChange = async (user: GoogleUser | null) => {
     setCloudReady(false);
-    setDiscordUser(user);
-    setStoredDiscordUser(user);
+    setGoogleUser(user);
+    setStoredGoogleUser(user);
 
     if (!user) {
       cloudSyncUidRef.current = null;
-      setSupplements([]);
-      setLogs([]);
-      setProfiles(INITIAL_PROFILES);
-      setActiveProfileId(INITIAL_PROFILES[0]?.id || 'profile_self');
-      setDismissedDoses({});
-      try {
-        localStorage.removeItem('suppletrack_supplements_v1');
-        localStorage.removeItem('suppletrack_logs_v1');
-        localStorage.removeItem('suppletrack_profiles_v1');
-        localStorage.removeItem('suppletrack_active_profile_v1');
-        localStorage.removeItem('suppletrack_dismissed_doses_v1');
-      } catch {}
-      setToastMessage('Signed out of Google. Private data was cleared from this app session.');
+      setToastMessage('Signed out of Google account.');
+      setTimeout(() => setToastMessage(null), 3000);
       return;
     }
 
@@ -166,8 +157,7 @@ export default function App() {
         setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         setToastMessage('Your data was restored automatically from Google Drive.');
       } else {
-        // First sign-in: preserve existing local data as a one-time migration.
-        // If this is a fresh device, the app's starter data is uploaded instead.
+        // First sign-in: preserve existing local data as a one-time backup
         await saveAutomaticDriveData({
           version: 2,
           appName: 'Supple Pulse',
@@ -179,22 +169,20 @@ export default function App() {
           dismissedDoses,
         });
         setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-        setToastMessage('Your data is now backed up to your Google account.');
+        setToastMessage('Your data is now backed up to your Google Drive.');
       }
       cloudSyncUidRef.current = user.id;
       setCloudReady(true);
     } catch (e: any) {
       cloudSyncUidRef.current = null;
-      setToastMessage(e?.message || 'Could not load your Google Drive data. Your current data was not overwritten.');
+      setToastMessage(e?.message || 'Could not load your Google Drive data.');
     } finally {
       setIsSyncing(false);
     }
   };
 
-
-
-  const handleDiscordSyncRegimen = async () => {
-    if (!discordUser) return;
+  const handleCloudSyncRegimen = async () => {
+    if (!googleUser) return;
     setIsSyncing(true);
     try {
       await saveAutomaticDriveData({
@@ -208,7 +196,7 @@ export default function App() {
         dismissedDoses,
       });
       setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      setToastMessage('Encrypted data saved to your Google Drive app data.');
+      setToastMessage('Saved to your private Google Drive app data.');
     } catch (e: any) {
       setToastMessage(e?.message || 'Google Drive save failed. Please sign in again.');
     } finally {
@@ -216,9 +204,57 @@ export default function App() {
     }
   };
 
-  const handleDiscordRestoreRegimen = async () => {
-    if (!discordUser) return;
-    await handleDiscordUserChange(discordUser);
+  const handleCloudRestoreRegimen = async () => {
+    if (!googleUser) return;
+    await handleGoogleUserChange(googleUser);
+  };
+
+  const activeProfile = useMemo(() => {
+    return profiles.find((p) => p.id === activeProfileId) || profiles[0] || INITIAL_PROFILES[0];
+  }, [profiles, activeProfileId]);
+
+  const profileMap = useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    profiles.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [profiles]);
+
+  const handleSelectProfile = (id: string) => {
+    setActiveProfileId(id);
+    saveActiveProfileId(id);
+    triggerHaptic('light');
+    const p = profiles.find((item) => item.id === id);
+    setToastMessage(`Switched profile to ${p?.name || 'User'} (${p?.relation || ''})`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleSaveProfiles = (newProfiles: UserProfile[]) => {
+    setProfiles(newProfiles);
+    saveProfiles(newProfiles);
+  };
+
+  const handleDeleteProfile = (profileId: string) => {
+    const updated = profiles.filter((p) => p.id !== profileId);
+    setProfiles(updated);
+    saveProfiles(updated);
+    if (activeProfileId === profileId) {
+      setActiveProfileId('profile_self');
+      saveActiveProfileId('profile_self');
+    }
+    setToastMessage('Profile deleted.');
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  const handleOpenSpecialChat = (prompt?: string) => {
+    setChatSpecialMode(true);
+    setChatInitialPrompt(prompt || 'Boron 6 mg: take every day for 2 weeks, then break for 1 week, repeat for life');
+    setIsChatOpen(true);
+  };
+
+  const handleOpenStandardChat = () => {
+    setChatSpecialMode(false);
+    setChatInitialPrompt(undefined);
+    setIsChatOpen(true);
   };
 
   // Real-time clock for live countdowns (updates every 10 seconds)
@@ -255,11 +291,6 @@ export default function App() {
   });
 
   useEffect(() => {
-    // Ensure screenshots are unlocked across all platforms and environments
-    disableScreenshotProtection();
-  }, []);
-
-  useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
@@ -278,13 +309,21 @@ export default function App() {
     });
   };
 
-  // Initialize data from localStorage on mount
+  // Initialize data from localStorage & IndexedDB on mount
   useEffect(() => {
     const loadedSupps = loadSupplements();
-    const loadedLogs = loadDoseLogs();
     setSupplements(loadedSupps);
-    setLogs(loadedLogs);
+    initDoseLogs().then((loadedLogs) => {
+      setLogs(loadedLogs);
+    });
   }, []);
+
+  // Schedule native device notification alarms
+  useEffect(() => {
+    if (supplements.length > 0) {
+      scheduleUpcomingDoseAlarms(supplements);
+    }
+  }, [supplements]);
 
   // Clock ticker for live countdowns
   useEffect(() => {
@@ -404,8 +443,8 @@ export default function App() {
   // Keep an encrypted Drive copy up to date after edits. The current local cache
   // remains for compatibility/offline resilience; Drive is the cross-device copy.
   useEffect(() => {
-    if (!discordUser || !cloudReady || cloudSyncUidRef.current !== discordUser.id) return;
-    const uid = discordUser.id;
+    if (!googleUser || !cloudReady || cloudSyncUidRef.current !== googleUser.id) return;
+    const uid = googleUser.id;
     const timer = window.setTimeout(async () => {
       if (cloudSyncUidRef.current !== uid) return;
       setIsSyncing(true);
@@ -426,9 +465,9 @@ export default function App() {
       } finally {
         setIsSyncing(false);
       }
-    }, 1200);
+    }, 2000);
     return () => window.clearTimeout(timer);
-  }, [discordUser, cloudReady, supplements, logs, profiles, activeProfileId, dismissedDoses]);
+  }, [googleUser, cloudReady, supplements, logs, profiles, activeProfileId, dismissedDoses]);
 
   // Account Security & Cloud Sync State
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -487,20 +526,14 @@ export default function App() {
 
     // Update inventory stock if tracking is enabled
     if (supplement.inventory?.trackStock) {
-      const remaining = Math.max(0, (supplement.inventory.currentStock || 0) - 1);
-      const updatedSupp: Supplement = {
-        ...supplement,
-        inventory: {
-          ...supplement.inventory,
-          currentStock: remaining,
-        },
-      };
+      const updatedSupp = deductStockOnDose(supplement, 1);
+      const stockCalc = calculateStockDaysRemaining(updatedSupp);
       const updatedSupplements = supplements.map((s) => (s.id === supplement.id ? updatedSupp : s));
       setSupplements(updatedSupplements);
       saveSupplements(updatedSupplements);
 
-      if (remaining <= (supplement.inventory.lowStockThreshold || 7)) {
-        setToastMessage(`Logged dose! Alert: ${supplement.name} is running low (${remaining} ${supplement.inventory.unit || 'units'} left).`);
+      if (stockCalc.isLowStock || stockCalc.isOutOfStock) {
+        setToastMessage(`Logged dose! Alert: ${supplement.name} is running low (~${stockCalc.daysRemaining ?? 0}d supply left).`);
         setTimeout(() => setToastMessage(null), 5000);
         return;
       }
@@ -539,6 +572,16 @@ export default function App() {
     const updatedLogs = logs.filter((l) => !(l.supplementId === supplementId && l.date === todayStr));
     setLogs(updatedLogs);
     saveDoseLogs(updatedLogs);
+
+    // Restore stock if inventory tracking is enabled
+    const target = supplements.find((s) => s.id === supplementId);
+    if (target?.inventory?.trackStock) {
+      const restored = restoreStockOnUndo(target, 1);
+      const updatedSupplements = supplements.map((s) => (s.id === supplementId ? restored : s));
+      setSupplements(updatedSupplements);
+      saveSupplements(updatedSupplements);
+    }
+
     setToastMessage('Cleared today\'s logged dose.');
     setTimeout(() => setToastMessage(null), 3000);
   };
@@ -622,13 +665,8 @@ export default function App() {
         syncToGoogleCalendar: false,
       };
       if (supplement.googleCalendarEventId && isGoogleCalendarConnected()) {
-        const confirmed = window.confirm(
-          `Disable calendar sync for "${supplement.name}"? Would you also like to remove the event from your Google Calendar?`
-        );
-        if (confirmed) {
-          deleteSupplementCalendarEvent(supplement.googleCalendarEventId).catch(console.warn);
-          updated.googleCalendarEventId = undefined;
-        }
+        deleteSupplementCalendarEvent(supplement.googleCalendarEventId).catch(console.warn);
+        updated.googleCalendarEventId = undefined;
       }
       const newSupplements = supplements.map((s) => (s.id === supplement.id ? updated : s));
       setSupplements(newSupplements);
@@ -670,13 +708,7 @@ export default function App() {
   const handleDeleteSupplement = (supplementId: string) => {
     const target = supplements.find((s) => s.id === supplementId);
     if (target?.googleCalendarEventId && isGoogleCalendarConnected()) {
-      // workspace-integration MANDATORY: User confirmation for destructive operations
-      const confirmed = window.confirm(
-        `Remove the scheduled recurring calendar events for "${target.name}" from your Google Calendar?`
-      );
-      if (confirmed) {
-        deleteSupplementCalendarEvent(target.googleCalendarEventId).catch(console.warn);
-      }
+      deleteSupplementCalendarEvent(target.googleCalendarEventId).catch(console.warn);
     }
     const updated = supplements.filter((s) => s.id !== supplementId);
     setSupplements(updated);
@@ -875,8 +907,8 @@ export default function App() {
         setActiveTab={setActiveTab}
         onOpenProfileSwitcher={() => setIsProfileModalOpen(true)}
         todayDueCount={todayDueCount}
-        discordUser={discordUser}
-        onOpenDiscordSecurity={() => setIsDiscordSecurityOpen(true)}
+        googleUser={googleUser}
+        onOpenCloudBackup={() => setIsCloudBackupOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
         activeProfile={activeProfile}
@@ -953,6 +985,11 @@ export default function App() {
                 setIsAddModalOpen(true);
               }}
               onRefillStock={handleRefillStock}
+              onUpdateSupplement={(s) => {
+                const updated = supplements.map((item) => (item.id === s.id ? s : item));
+                setSupplements(updated);
+                saveSupplements(updated);
+              }}
               currentTime={currentTime}
               profiles={profiles}
               activeProfileId={activeProfileId}
@@ -1074,6 +1111,10 @@ export default function App() {
               setSupplements(updated);
               saveSupplements(updated);
             }}
+            onBatchUpdateSupplements={(newSupps) => {
+              setSupplements(newSupps);
+              saveSupplements(newSupps);
+            }}
           />
         )}
 
@@ -1087,11 +1128,11 @@ export default function App() {
               setSupplements(loadSupplements());
               setLogs(loadDoseLogs());
             }}
-            discordUser={discordUser}
+            googleUser={googleUser}
             isSyncing={isSyncing}
             lastSyncedTime={lastSyncedTime}
-            onOpenDiscordSecurity={() => setIsDiscordSecurityOpen(true)}
-            onQuickSyncCloud={handleDiscordSyncRegimen}
+            onOpenCloudBackup={() => setIsCloudBackupOpen(true)}
+            onQuickSyncCloud={handleCloudSyncRegimen}
           />
         )}
 
@@ -1142,15 +1183,22 @@ export default function App() {
         onDeleteProfile={handleDeleteProfile}
       />
 
-      {/* Discord-Style Security & IP Authorization Modal */}
-      <DiscordSecurityModal
-        isOpen={isDiscordSecurityOpen}
-        onClose={() => setIsDiscordSecurityOpen(false)}
-        currentUser={discordUser}
-        onUserChange={handleDiscordUserChange}
-        onSyncRegimen={handleDiscordSyncRegimen}
-        onRestoreRegimen={handleDiscordRestoreRegimen}
-        localSupplementsCount={supplements.length}
+      {/* Cloud Backup & Google Drive AppData Sync Modal */}
+      <CloudBackupModal
+        isOpen={isCloudBackupOpen}
+        onClose={() => setIsCloudBackupOpen(false)}
+        googleUser={googleUser}
+        onUserChange={handleGoogleUserChange}
+        onSyncRegimen={handleCloudSyncRegimen}
+        onRestoreRegimen={handleCloudRestoreRegimen}
+        isSyncing={isSyncing}
+        lastSyncedTime={lastSyncedTime}
+        supplements={supplements}
+        logs={logs}
+        onRefreshData={() => {
+          setSupplements(loadSupplements());
+          setLogs(loadDoseLogs());
+        }}
       />
 
       {/* AI Chat Drawer */}

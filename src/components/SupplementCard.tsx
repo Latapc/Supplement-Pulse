@@ -14,11 +14,21 @@ import {
   RefreshCw,
   Infinity as InfinityIcon,
   Repeat,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  DollarSign,
+  Sun,
+  Zap,
+  Moon,
+  Dumbbell
 } from 'lucide-react';
 import { Supplement, TodaySupplementStatus, DayOfWeek } from '../types/supplement';
 import { UserProfile } from '../types/profile';
 import { getDayName, getDayShortName } from '../utils/dates';
+import { 
+  categorizeTimingSlot, 
+  TIMING_SLOT_METAS, 
+  calculateStockDaysRemaining 
+} from '../utils/inventory';
 
 interface SupplementCardProps {
   supplement: Supplement;
@@ -71,6 +81,11 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
   const bottleSize = supplement.inventory?.bottleSize ?? 60;
   const stockPercent = Math.min(100, Math.max(0, Math.round((currentStock / bottleSize) * 100)));
 
+  // Dynamic 7-day stock and timing slot calculations
+  const timingSlot = supplement.timingSlot || categorizeTimingSlot(supplement);
+  const timingMeta = TIMING_SLOT_METAS[timingSlot];
+  const stockCalc = calculateStockDaysRemaining(supplement);
+
   // Expiry calculations
   const isBottleExpired = status.expiryStatus?.isExpired;
   const isBottleExpiringSoon = status.expiryStatus?.isNearingExpiry;
@@ -81,11 +96,11 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
         ? 'border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900/60 opacity-85'
         : isBottleExpired
         ? 'border-rose-400 dark:border-rose-800 bg-rose-50/20 dark:bg-rose-950/40 ring-1 ring-rose-200 dark:ring-rose-800'
-        : isOutOfStock
+        : stockCalc.isOutOfStock
         ? 'border-rose-300 dark:border-rose-800 ring-1 ring-rose-100 dark:ring-rose-900 bg-white dark:bg-stone-900'
         : isBottleExpiringSoon
         ? 'border-amber-400 dark:border-amber-800 bg-amber-50/20 dark:bg-amber-950/40 ring-1 ring-amber-200 dark:ring-amber-800'
-        : isLowStock
+        : stockCalc.isLowStock
         ? 'border-amber-300 dark:border-amber-800 ring-1 ring-amber-100 dark:ring-amber-900 bg-white dark:bg-stone-900'
         : 'border-stone-200/90 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700'
     }`}>
@@ -105,6 +120,14 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
             <span className="capitalize font-medium text-stone-700 dark:text-stone-300">
               {supplement.category} · {supplement.form}
             </span>
+
+            {/* Smart Timing Slot Badge */}
+            {timingMeta && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${timingMeta.badgeBg} ${timingMeta.badgeText} ${timingMeta.borderClass}`}>
+                <span>{timingMeta.shortLabel}</span>
+              </span>
+            )}
+
             {isCyclic && (
               <span className="text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 px-2 py-0.5 rounded-full flex items-center gap-1">
                 <Repeat className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
@@ -121,6 +144,12 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
               <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950/90 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 px-2 py-0.5 rounded-full flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                 <span>Expiring ({status.expiryStatus?.daysUntilExpiry}d)</span>
+              </span>
+            )}
+            {stockCalc.isLowStock && (
+              <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-950/90 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                <span>Low Stock ({stockCalc.daysRemaining}d left)</span>
               </span>
             )}
           </div>
@@ -306,19 +335,19 @@ export const SupplementCard: React.FC<SupplementCardProps> = ({
               />
             </div>
 
-            <div className="flex items-center justify-between text-[11px]">
+            <div className="flex items-center justify-between text-[11px] gap-2 flex-wrap">
               <span className="text-stone-500 dark:text-stone-400">
-                {isOutOfStock
+                {stockCalc.isOutOfStock
                   ? 'Zero remaining! Refill immediately.'
-                  : isLowStock
-                  ? `Only ${currentStock} doses remaining.`
-                  : `${stockPercent}% remaining in bottle`}
+                  : stockCalc.isLowStock
+                  ? `Only ${stockCalc.remainingServings} doses (${stockCalc.daysRemaining}d left) · Refill by ${stockCalc.refillDateFormatted}`
+                  : `${stockPercent}% in bottle · ~${stockCalc.daysRemaining} days remaining`}
               </span>
               {onRefillStock && (
                 <button
                   type="button"
                   onClick={() => onRefillStock(supplement.id)}
-                  className="font-bold underline text-stone-800 dark:text-stone-100 hover:text-emerald-700 dark:hover:text-emerald-400"
+                  className="font-bold underline text-stone-800 dark:text-stone-100 hover:text-emerald-700 dark:hover:text-emerald-400 cursor-pointer"
                 >
                   Refill Bottle
                 </button>

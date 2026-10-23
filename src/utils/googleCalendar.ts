@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Supplement, DayOfWeek } from '../types/supplement';
-import { formatDateToYYYYMMDD, parseYYYYMMDD, calculateEndDate } from './dates';
+import { formatDateToYYYYMMDD, parseYYYYMMDD, calculateEndDate, getCourseStatus } from './dates';
 
 // Scopes required for Google Calendar Events
 export const CALENDAR_SCOPES = [
@@ -96,6 +96,20 @@ export async function signInWithGoogle(): Promise<{ user: User; accessToken: str
 }
 
 /**
+ * Sign out of Google Account
+ */
+export async function signOutGoogle(): Promise<void> {
+  try {
+    await signOut(auth);
+    cachedAccessToken = null;
+    cachedDriveAccessToken = null;
+    notifySubscribers();
+  } catch (e) {
+    console.warn('Error signing out of Google:', e);
+  }
+}
+
+/**
  * Encrypt backup data in the browser with a user-held passphrase before it reaches Drive.
  * The passphrase and derived key are never persisted or sent to any server.
  */
@@ -116,7 +130,11 @@ function toBase64(bytes: Uint8Array): string {
 
 function fromBase64(value: string): Uint8Array {
   const binary = atob(value);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 async function deriveBackupKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
@@ -128,7 +146,7 @@ async function deriveBackupKey(passphrase: string, salt: Uint8Array): Promise<Cr
     ['deriveKey'],
   );
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: BACKUP_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: salt as unknown as BufferSource, iterations: BACKUP_ITERATIONS, hash: 'SHA-256' },
     material,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -142,7 +160,7 @@ async function encryptBackup(payload: unknown, passphrase: string): Promise<stri
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveBackupKey(passphrase, salt);
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as unknown as BufferSource }, key, plaintext);
   return JSON.stringify({
     format: 'supple-pulse-encrypted-backup',
     version: 1,
@@ -168,9 +186,9 @@ async function decryptBackup<T>(raw: unknown, passphrase: string): Promise<T> {
   try {
     const key = await deriveBackupKey(passphrase, fromBase64(envelope.salt));
     const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: fromBase64(envelope.iv) },
+      { name: 'AES-GCM', iv: fromBase64(envelope.iv) as unknown as BufferSource },
       key,
-      fromBase64(envelope.ciphertext),
+      fromBase64(envelope.ciphertext) as unknown as BufferSource,
     );
     return JSON.parse(new TextDecoder().decode(plaintext)) as T;
   } catch {
@@ -275,11 +293,11 @@ async function getOrCreateAutomaticKey(uid: string, files: DriveFileMeta[]): Pro
         stored?.uid !== uid || typeof stored?.key !== 'string') {
       throw new Error('The cloud encryption key file is invalid or belongs to a different account.');
     }
-    return crypto.subtle.importKey('raw', fromBase64(stored.key), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    return crypto.subtle.importKey('raw', fromBase64(stored.key) as unknown as BufferSource, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
   }
 
   const rawKey = crypto.getRandomValues(new Uint8Array(32));
-  const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  const key = await crypto.subtle.importKey('raw', rawKey as unknown as BufferSource, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
   await writeDriveAppDataFile(AUTO_KEY_FILE_NAME, JSON.stringify({
     format: 'supple-pulse-auto-key',
     version: 2,
@@ -305,8 +323,8 @@ export async function saveAutomaticDriveData(payload: unknown): Promise<void> {
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));
   const ciphertext = await crypto.subtle.encrypt({
     name: 'AES-GCM',
-    iv,
-    additionalData: new TextEncoder().encode(user.uid),
+    iv: iv as unknown as BufferSource,
+    additionalData: new TextEncoder().encode(user.uid) as unknown as BufferSource,
   }, key, plaintext);
   const envelope = {
     format: 'supple-pulse-cloud-data',
@@ -333,7 +351,7 @@ export async function loadAutomaticDriveData<T>(): Promise<T | null> {
       storedKey?.uid !== user.uid || typeof storedKey?.key !== 'string') {
     throw new Error('The cloud encryption key file is invalid or belongs to a different account.');
   }
-  const key = await crypto.subtle.importKey('raw', fromBase64(storedKey.key), { name: 'AES-GCM' }, false, ['decrypt']);
+  const key = await crypto.subtle.importKey('raw', fromBase64(storedKey.key) as unknown as BufferSource, { name: 'AES-GCM' }, false, ['decrypt']);
   const envelope = await readDriveAppDataFile(dataFile.id);
   if (envelope?.format !== 'supple-pulse-cloud-data' || envelope?.version !== 2 ||
       envelope?.cipher !== 'AES-256-GCM' || envelope?.uid !== user.uid ||
@@ -343,9 +361,9 @@ export async function loadAutomaticDriveData<T>(): Promise<T | null> {
   try {
     const plaintext = await crypto.subtle.decrypt({
       name: 'AES-GCM',
-      iv: fromBase64(envelope.iv),
-      additionalData: new TextEncoder().encode(user.uid),
-    }, key, fromBase64(envelope.ciphertext));
+      iv: fromBase64(envelope.iv) as unknown as BufferSource,
+      additionalData: new TextEncoder().encode(user.uid) as unknown as BufferSource,
+    }, key, fromBase64(envelope.ciphertext) as unknown as BufferSource);
     return JSON.parse(new TextDecoder().decode(plaintext)) as T;
   } catch {
     throw new Error('The cloud backup could not be decrypted. The data was left unchanged.');
@@ -521,6 +539,13 @@ export function buildEventPayload(supplement: Supplement) {
       ],
     },
     colorId: supplement.category === 'vitamins' ? '5' : supplement.category === 'minerals' ? '6' : '10',
+    extendedProperties: {
+      private: {
+        app: 'supple-pulse',
+        supplementId: supplement.id,
+        appName: 'Supple Pulse',
+      },
+    },
   };
 }
 
@@ -591,8 +616,11 @@ export async function syncSupplementToGoogleCalendar(
 /**
  * Deletes an event from Google Calendar (Requires User Confirmation dialog per guidelines)
  */
-export async function deleteSupplementCalendarEvent(eventId: string): Promise<boolean> {
-  const token = getCalendarAccessToken();
+export async function deleteSupplementCalendarEvent(
+  eventId: string,
+  explicitToken?: string
+): Promise<boolean> {
+  const token = explicitToken || getCalendarAccessToken();
   if (!token || !eventId) return false;
 
   try {
@@ -605,11 +633,274 @@ export async function deleteSupplementCalendarEvent(eventId: string): Promise<bo
         },
       }
     );
-    return res.status === 204 || res.ok;
+    return res.status === 204 || res.status === 404 || res.status === 410 || res.ok;
   } catch (err) {
     console.error('Failed to delete Google Calendar event:', err);
     return false;
   }
+}
+
+export interface AppCalendarEventItem {
+  id: string;
+  summary: string;
+  description?: string;
+  startTime?: string;
+  recurrence?: string[];
+  supplementName?: string;
+  matchedBy: 'eventId' | 'metadata' | 'query';
+}
+
+export interface DeleteAllCalendarResult {
+  success: boolean;
+  deletedCount: number;
+  clearedLocalCount: number;
+  deletedSummaries: string[];
+  errors: string[];
+}
+
+/**
+ * Scans Google Calendar to preview all events created or synced by Supple Pulse
+ */
+export async function findAppCalendarEvents(
+  supplements: Supplement[],
+  explicitToken?: string
+): Promise<{
+  events: AppCalendarEventItem[];
+  canConnect: boolean;
+}> {
+  const token = explicitToken || getCalendarAccessToken();
+  if (!token) {
+    return { events: [], canConnect: false };
+  }
+
+  const eventsMap = new Map<string, AppCalendarEventItem>();
+
+  const addEvent = (item: any, matchedBy: 'eventId' | 'metadata' | 'query') => {
+    if (!item?.id || eventsMap.has(item.id)) return;
+    
+    const supp = supplements.find(
+      (s) => s.googleCalendarEventId === item.id || 
+             (item.summary && item.summary.toLowerCase().includes(s.name.toLowerCase()))
+    );
+
+    eventsMap.set(item.id, {
+      id: item.id,
+      summary: item.summary || 'Supplement Dose Event',
+      description: item.description,
+      startTime: item.start?.dateTime || item.start?.date,
+      recurrence: item.recurrence,
+      supplementName: supp?.name,
+      matchedBy,
+    });
+  };
+
+  // 1. Query for events containing "Supple Pulse" with pagination support
+  try {
+    let pageToken: string | undefined = undefined;
+    let pageCount = 0;
+    do {
+      const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+      url.searchParams.set('q', 'Supple Pulse');
+      url.searchParams.set('maxResults', '250');
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+      const res = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.items)) {
+          for (const item of data.items) {
+            if (
+              item.description?.includes('Supple Pulse') ||
+              item.summary?.includes('💊 Take') ||
+              item.extendedProperties?.private?.app === 'supple-pulse'
+            ) {
+              addEvent(item, 'query');
+            }
+          }
+        }
+        pageToken = data.nextPageToken;
+        pageCount++;
+      } else {
+        break;
+      }
+    } while (pageToken && pageCount < 5);
+  } catch (err) {
+    console.warn('Error querying Google Calendar for Supple Pulse events:', err);
+  }
+
+  // 2. Fetch specific events for known googleCalendarEventIds not yet retrieved
+  for (const supp of supplements) {
+    if (supp.googleCalendarEventId && !eventsMap.has(supp.googleCalendarEventId)) {
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(supp.googleCalendarEventId)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const item = await res.json();
+          addEvent(item, 'eventId');
+        }
+      } catch {
+        // Ignored, might be 404
+      }
+    }
+  }
+
+  // 3. Query for events starting with '💊 Take' to catch any renamed descriptions
+  try {
+    const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+    url.searchParams.set('q', 'Take');
+    url.searchParams.set('maxResults', '100');
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.items)) {
+        for (const item of data.items) {
+          if (
+            item.summary?.startsWith('💊 Take') &&
+            supplements.some((s) => item.summary.includes(s.name))
+          ) {
+            addEvent(item, 'query');
+          }
+        }
+      }
+    }
+  } catch {
+    // Non-critical secondary search
+  }
+
+  return {
+    events: Array.from(eventsMap.values()),
+    canConnect: true,
+  };
+}
+
+/**
+ * Deletes EVERY change made to Google Calendar by Supple Pulse:
+ * 1. Scans Google Calendar for all events containing Supple Pulse or tracked IDs
+ * 2. Deletes each event from the primary Google Calendar via API
+ * 3. Clears calendar sync status (googleCalendarEventId, syncToGoogleCalendar, lastCalendarSyncAt) across all supplements
+ */
+export async function deleteAllAppCalendarEvents(
+  supplements: Supplement[],
+  onUpdateSupplement?: (supp: Supplement) => void,
+  explicitToken?: string
+): Promise<DeleteAllCalendarResult> {
+  const token = explicitToken || getCalendarAccessToken();
+  const errors: string[] = [];
+  const deletedSummaries: string[] = [];
+  let deletedCount = 0;
+  let clearedLocalCount = 0;
+
+  const eventIdsToDelete = new Set<string>();
+
+  // 1. Collect all stored event IDs from supplements
+  for (const supp of supplements) {
+    if (supp.googleCalendarEventId) {
+      eventIdsToDelete.add(supp.googleCalendarEventId);
+    }
+  }
+
+  // 2. If token is available, scan and find all remote events
+  if (token) {
+    const scanResult = await findAppCalendarEvents(supplements, token);
+    for (const ev of scanResult.events) {
+      eventIdsToDelete.add(ev.id);
+    }
+
+    // 3. Delete each event via Google Calendar API
+    for (const eventId of eventIdsToDelete) {
+      try {
+        const delRes = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+          {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (delRes.status === 204 || delRes.ok || delRes.status === 404 || delRes.status === 410) {
+          deletedCount++;
+          const found = scanResult.events.find((e) => e.id === eventId);
+          if (found) {
+            deletedSummaries.push(found.summary);
+          } else {
+            deletedSummaries.push(`Calendar Event (${eventId})`);
+          }
+        } else {
+          errors.push(`Event ${eventId}: status ${delRes.status}`);
+        }
+      } catch (err: any) {
+        errors.push(`Event ${eventId}: ${err.message || 'Network error'}`);
+      }
+    }
+  }
+
+  // 4. Clear all calendar metadata from supplements
+  for (const supp of supplements) {
+    if (supp.googleCalendarEventId || supp.syncToGoogleCalendar) {
+      clearedLocalCount++;
+      const updated: Supplement = {
+        ...supp,
+        googleCalendarEventId: undefined,
+        syncToGoogleCalendar: false,
+        lastCalendarSyncAt: undefined,
+      };
+      if (onUpdateSupplement) {
+        onUpdateSupplement(updated);
+      }
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    deletedCount,
+    clearedLocalCount,
+    deletedSummaries,
+    errors,
+  };
+}
+
+/**
+ * Removes a single supplement's events from Google Calendar and unlinks it locally
+ */
+export async function removeSupplementFromCalendar(
+  supplement: Supplement,
+  onUpdateSupplement?: (supp: Supplement) => void,
+  explicitToken?: string
+): Promise<{ success: boolean; error?: string }> {
+  const token = explicitToken || getCalendarAccessToken();
+
+  if (supplement.googleCalendarEventId && token) {
+    try {
+      await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(supplement.googleCalendarEventId)}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+    } catch (e: any) {
+      console.warn('Could not delete calendar event:', e);
+    }
+  }
+
+  const updated: Supplement = {
+    ...supplement,
+    syncToGoogleCalendar: false,
+    googleCalendarEventId: undefined,
+    lastCalendarSyncAt: undefined,
+  };
+
+  if (onUpdateSupplement) {
+    onUpdateSupplement(updated);
+  }
+
+  return { success: true };
 }
 
 /**
@@ -702,7 +993,7 @@ export function downloadICalFile(supplement: Supplement): void {
  * Generates an iCalendar (.ics) format file containing ALL active supplements
  */
 export function generateAllICalData(supplements: Supplement[]): string {
-  const activeSupps = supplements.filter((s) => s.active);
+  const activeSupps = supplements.filter((s) => !s.archived && getCourseStatus(s).isCourseActive);
   const nowUtc = new Date().toISOString().replace(/-|:|\.\d\d\d/g, '');
   const formatUtc = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, '');
   const todayStr = formatDateToYYYYMMDD(new Date());

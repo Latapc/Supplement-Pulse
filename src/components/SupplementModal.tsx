@@ -12,7 +12,7 @@ import {
   Calendar as CalendarIcon,
   Utensils
 } from 'lucide-react';
-import { Supplement, DoseUnit, FrequencyType, DayOfWeek, FoodTiming } from '../types/supplement';
+import { Supplement, DoseUnit, FrequencyType, DayOfWeek, FoodTiming, TimingSlot } from '../types/supplement';
 import { UserProfile } from '../types/profile';
 import { formatDateToYYYYMMDD, calculateEndDate, getDayShortName } from '../utils/dates';
 
@@ -140,6 +140,8 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
   // Timing & Food Intake
   const [doseTime, setDoseTime] = useState<string>('09:00');
   const [foodTiming, setFoodTiming] = useState<FoodTiming>('with_food');
+  const [timingSlot, setTimingSlot] = useState<TimingSlot>('with_meals');
+  const [costPerBottle, setCostPerBottle] = useState<string>('');
 
   // Google Calendar Integration
   const [syncToCalendar, setSyncToCalendar] = useState<boolean>(true);
@@ -181,6 +183,8 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
       setIntervalDays(editingSupplement.intervalDays || 2);
       setDoseTime(editingSupplement.doseTime || '09:00');
       setFoodTiming(editingSupplement.foodTiming || 'with_food');
+      setTimingSlot(editingSupplement.timingSlot || 'with_meals');
+      setCostPerBottle(editingSupplement.costPerBottle !== undefined ? editingSupplement.costPerBottle.toString() : '');
       setSyncToCalendar(editingSupplement.syncToGoogleCalendar ?? true);
       
       // Cyclic
@@ -222,6 +226,8 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
       setIntervalDays(2);
       setDoseTime('09:00');
       setFoodTiming('with_food');
+      setTimingSlot('with_meals');
+      setCostPerBottle('');
       setSyncToCalendar(true);
       setIsCyclic(false);
       setOnDays(14);
@@ -316,6 +322,8 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
       intervalDays: frequencyType === 'interval' ? Number(intervalDays) : undefined,
       doseTime: doseTime || '09:00',
       foodTiming: foodTiming || 'with_food',
+      timingSlot,
+      costPerBottle: costPerBottle && !isNaN(parseFloat(costPerBottle)) ? parseFloat(costPerBottle) : undefined,
       syncToGoogleCalendar: syncToCalendar,
       googleCalendarEventId: editingSupplement?.googleCalendarEventId,
       lastCalendarSyncAt: editingSupplement?.lastCalendarSyncAt,
@@ -710,6 +718,29 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
                 Absorption guidance displayed on calendar & notifications
               </span>
             </div>
+
+            {/* Smart Timing Slot */}
+            <div>
+              <label className="block text-xs font-semibold text-stone-800 dark:text-stone-200 mb-1.5 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Actionable Daily Timing Slot</span>
+              </label>
+              <select
+                value={timingSlot}
+                onChange={(e) => setTimingSlot(e.target.value as any)}
+                className="w-full h-10 px-3 rounded-xl border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-white text-xs bg-white dark:bg-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="morning_empty_stomach">🌅 Morning / Empty Stomach (Fasted Co-factors, Probiotics, Thyroid)</option>
+                <option value="pre_workout">⚡ Pre-Workout (Citrulline, Beta-Alanine, Nitric Oxide)</option>
+                <option value="with_meals">🥗 With Meals (Fat-Soluble: D3, Omega-3s, K2, Curcumin)</option>
+                <option value="post_workout">🏋️ Post-Workout (Protein synthesis, Creatine, Glutamine)</option>
+                <option value="bedtime">🌙 Bedtime & Evening (Magnesium, Theanine, Apigenin)</option>
+                <option value="anytime">🕒 Flexible / Any Time</option>
+              </select>
+              <span className="text-[11px] text-stone-500 mt-1 block">
+                Groups daily intake into chronobiological categories on your Today checklist
+              </span>
+            </div>
           </div>
 
           {/* 'Sync to Calendar' Automated Event Creation Toggle */}
@@ -843,6 +874,21 @@ export const SupplementModal: React.FC<SupplementModalProps> = ({
                     className="w-full h-10 px-3 rounded-xl border border-stone-300 text-xs text-stone-900 font-mono"
                     placeholder="e.g. 7"
                     required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-stone-600 mb-1">
+                    Bottle Cost ($) (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={costPerBottle}
+                    onChange={(e) => setCostPerBottle(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-stone-300 text-xs text-stone-900 font-mono"
+                    placeholder="e.g. 24.99"
                   />
                 </div>
 

@@ -1,9 +1,11 @@
 import { Supplement, DoseLog } from '../types/supplement';
 import { UserProfile, INITIAL_PROFILES } from '../types/profile';
 import { formatDateToYYYYMMDD, calculateEndDate } from './dates';
+import { get as idbGet, set as idbSet } from 'idb-keyval';
 
 const STORAGE_SUPPLEMENTS_KEY = 'suppletrack_supplements_v1';
 const STORAGE_LOGS_KEY = 'suppletrack_logs_v1';
+const IDB_LOGS_KEY = 'suppletrack_idb_logs_v1';
 const STORAGE_PROFILES_KEY = 'suppletrack_profiles_v1';
 const STORAGE_ACTIVE_PROFILE_KEY = 'suppletrack_active_profile_v1';
 
@@ -444,6 +446,41 @@ export function saveSupplements(supplements: Supplement[]) {
   }
 }
 
+export async function initDoseLogs(): Promise<DoseLog[]> {
+  try {
+    const idbLogs = await idbGet<DoseLog[]>(IDB_LOGS_KEY);
+    if (Array.isArray(idbLogs) && idbLogs.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_LOGS_KEY, JSON.stringify(idbLogs));
+      } catch {}
+      return idbLogs.map(log => ({
+        ...log,
+        profileId: log.profileId || 'profile_self',
+      }));
+    }
+
+    const rawLocal = localStorage.getItem(STORAGE_LOGS_KEY);
+    if (rawLocal) {
+      const parsed: DoseLog[] = JSON.parse(rawLocal);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        await idbSet(IDB_LOGS_KEY, parsed);
+        return parsed.map(log => ({
+          ...log,
+          profileId: log.profileId || 'profile_self',
+        }));
+      }
+    }
+
+    const initial = getInitialLogs();
+    saveDoseLogs(initial);
+    await idbSet(IDB_LOGS_KEY, initial);
+    return initial;
+  } catch (e) {
+    console.warn('IndexedDB initialization failed, falling back to localStorage:', e);
+    return loadDoseLogs();
+  }
+}
+
 export function loadDoseLogs(): DoseLog[] {
   try {
     const raw = localStorage.getItem(STORAGE_LOGS_KEY);
@@ -469,6 +506,52 @@ export function saveDoseLogs(logs: DoseLog[]) {
   } catch (e) {
     console.error('Error saving dose logs to storage', e);
   }
+  try {
+    idbSet(IDB_LOGS_KEY, logs).catch((err) => {
+      console.warn('Failed to persist logs in IndexedDB:', err);
+    });
+  } catch (e) {
+    console.warn('IDB write failed:', e);
+  }
+}
+
+export function exportLogsToCSV(logs: DoseLog[], supplements: Supplement[]): void {
+  const suppMap = new Map<string, Supplement>();
+  supplements.forEach((s) => suppMap.set(s.id, s));
+
+  const headers = ['Date', 'Time', 'Supplement Name', 'Amount Taken', 'Unit', 'Form', 'Profile ID', 'Notes', 'Timestamp'];
+
+  const escapeCsv = (val: string | number | undefined | null) => {
+    if (val === undefined || val === null) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  const rows = logs.map((log) => {
+    const supp = suppMap.get(log.supplementId);
+    return [
+      escapeCsv(log.date),
+      escapeCsv(log.time),
+      escapeCsv(log.supplementName),
+      escapeCsv(log.amountTaken),
+      escapeCsv(log.unit),
+      escapeCsv(supp?.form || 'capsule'),
+      escapeCsv(log.profileId || 'profile_self'),
+      escapeCsv(log.notes || ''),
+      escapeCsv(log.timestamp),
+    ].join(',');
+  });
+
+  const csvContent = [headers.join(','), ...rows].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `supple-pulse-intake-history-${formatDateToYYYYMMDD(new Date())}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export function exportBackupData(): string {
@@ -512,3 +595,4 @@ export function resetToDemoData() {
   saveDoseLogs(logs);
   return { supps, logs, profiles };
 }
+

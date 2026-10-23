@@ -1,4 +1,7 @@
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { playReminderChime, triggerHaptic } from './soundEffects';
+import { Supplement } from '../types/supplement';
+import { formatDateToYYYYMMDD } from './dates';
 
 export interface NotificationSettings {
   enabled: boolean;
@@ -49,12 +52,23 @@ export function getNotificationPermission(): NotificationPermission {
 }
 
 /**
- * Request notification permission from user
+ * Request notification permission from user (Web + Capacitor)
  */
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (typeof window !== 'undefined') {
     localStorage.setItem('suppletrack_alerts_enabled', 'true');
   }
+
+  // Capacitor native permissions if running in native wrapper
+  try {
+    const capStatus = await LocalNotifications.checkPermissions();
+    if (capStatus.display !== 'granted') {
+      await LocalNotifications.requestPermissions();
+    }
+  } catch (e) {
+    // Not running on Capacitor native platform or unsupported web runtime
+  }
+
   if (typeof window === 'undefined' || !('Notification' in window)) {
     return 'granted';
   }
@@ -88,6 +102,26 @@ export function sendDoseNotification(options: {
     triggerHaptic('medium');
   }
 
+  // Capacitor native notification dispatch
+  try {
+    const notifId = Math.floor(Math.random() * 1000000);
+    LocalNotifications.schedule({
+      notifications: [
+        {
+          id: notifId,
+          title: options.title,
+          body: options.body,
+          schedule: { at: new Date(Date.now() + 100) },
+          sound: 'beep.wav',
+          smallIcon: 'ic_stat_capsule',
+        },
+      ],
+    }).catch(() => {});
+  } catch (e) {
+    // Web fallback
+  }
+
+  // Web Notification dispatch
   if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
     try {
       const notif = new Notification(options.title, {
@@ -106,6 +140,45 @@ export function sendDoseNotification(options: {
     } catch (e) {
       console.warn('Native notification display failed, relying on in-app toast', e);
     }
+  }
+}
+
+/**
+ * Schedule upcoming dose alarms for today via Capacitor LocalNotifications
+ */
+export async function scheduleUpcomingDoseAlarms(supplements: Supplement[]): Promise<void> {
+  try {
+    const now = new Date();
+    const todayStr = formatDateToYYYYMMDD(now);
+    const notificationsToSchedule = [];
+
+    for (let i = 0; i < supplements.length; i++) {
+      const supp = supplements[i];
+      if (!supp.doseTime) continue;
+
+      const [hStr, mStr] = supp.doseTime.split(':');
+      const hour = parseInt(hStr, 10);
+      const minute = parseInt(mStr, 10);
+
+      const scheduledDate = new Date(now);
+      scheduledDate.setHours(hour, minute, 0, 0);
+
+      if (scheduledDate > now) {
+        notificationsToSchedule.push({
+          id: (i + 1) * 1000 + scheduledDate.getDate(),
+          title: `Supple Pulse: ${supp.name}`,
+          body: `Time for your scheduled ${supp.doseAmount.toLocaleString()} ${supp.unit} of ${supp.name}!`,
+          schedule: { at: scheduledDate },
+          sound: 'beep.wav',
+        });
+      }
+    }
+
+    if (notificationsToSchedule.length > 0) {
+      await LocalNotifications.schedule({ notifications: notificationsToSchedule });
+    }
+  } catch (err) {
+    // Non-fatal if on pure web
   }
 }
 

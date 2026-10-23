@@ -1,6 +1,6 @@
 {
-  "summary":  "Comprehensive implementation plan for consolidating the calendar view exclusively inside Trends and Insights, placing the Account & Security button strictly in the mobile menu drawer, implementing 1-tap Google sign-in with direct calendar event links, and removing top-right clutter, fake email chips, and download instruction modals.",
-  "updatedAt":  "2026-10-10T10:15:46.670185175Z",
+  "summary":  "Implementation plan updated with all 6 mandatory user corrections:\n1. Physical serving count inventory decrements (decoupling chemical strength like 60,000 IU or 1,500 mg from physical capsule count).\n2. Schedule- and frequency-aware refill formulas (weekly intake and cyclic protocol math).\n3. Explicit 'Take All [Slot]' batch action headers with consolidated undo toasts.\n4. Dynamic hiding of unpopulated/empty time slots on rest days.\n5. 2-second debounce on Google Drive cloud sync to avoid HTTP 429 rate limits.\n6. Resolution of App.tsx state, memoized profile maps, and handlers for clean zero-error compilation.",
+  "updatedAt":  "2026-10-21T17:44:26.490343365Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

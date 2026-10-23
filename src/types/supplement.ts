@@ -6,6 +6,14 @@ export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday, 1 = Monday, ..
 
 export type FoodTiming = 'anytime' | 'with_food' | 'empty_stomach' | 'before_bed' | 'with_morning_meal';
 
+export type TimingSlot = 
+  | 'morning_empty_stomach' 
+  | 'pre_workout' 
+  | 'with_meals' 
+  | 'post_workout' 
+  | 'bedtime' 
+  | 'anytime';
+
 export interface DurationConfig {
   type: 'continuous' | 'fixed' | 'infinity';
   startDate: string; // YYYY-MM-DD
@@ -73,6 +81,10 @@ export interface Supplement {
   googleCalendarEventId?: string;
   lastCalendarSyncAt?: string;
 
+  // Smart Timing Slot & Value Tracking
+  timingSlot?: TimingSlot;
+  costPerBottle?: number; // e.g. 24.99 for value analysis
+
   // Course / Timer
   duration: DurationConfig;
   
@@ -126,6 +138,10 @@ export interface TodaySupplementStatus {
   stockUnit?: string;
   nextDoseCountdownText: string;
   expiryStatus?: ExpiryStatusInfo;
+  timingSlot?: TimingSlot;
+  daysOfSupplyRemaining?: number | null;
+  predictedRefillDate?: string;
+  refillDateFormatted?: string;
 }
 
 export interface CloudRegimenData {

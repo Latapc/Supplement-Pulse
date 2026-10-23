@@ -10,13 +10,18 @@ import {
   AlertTriangle,
   RefreshCw,
   Trash2,
-  X
+  X,
+  LayoutGrid,
+  ListChecks,
+  DollarSign
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { TodaySupplementStatus, Supplement, DoseLog } from '../types/supplement';
 import { UserProfile } from '../types/profile';
 import { playChimeSound } from '../utils/audio';
 import { triggerHaptic, playSuccessChime } from '../utils/soundEffects';
+import { DailyChecklist } from './DailyChecklist';
+import { ValueCalculator } from './ValueCalculator';
 
 interface TodayDosesProps {
   todayStatuses: TodaySupplementStatus[];
@@ -31,6 +36,7 @@ interface TodayDosesProps {
   onOpenAddModal: () => void;
   onSelectSupplement: (supplement: Supplement) => void;
   onRefillStock?: (supplementId: string) => void;
+  onUpdateSupplement?: (supplement: Supplement) => void;
   currentTime: Date;
   profiles?: UserProfile[];
   activeProfileId?: string;
@@ -51,12 +57,15 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
   onOpenAddModal,
   onSelectSupplement,
   onRefillStock,
+  onUpdateSupplement,
   currentTime,
   profiles = [],
   activeProfileId = 'profile_self',
   onSelectProfile,
   onOpenProfileSwitcher,
 }) => {
+  const [viewMode, setViewMode] = useState<'slots' | 'cards'>('slots');
+  const [isValueCalcOpen, setIsValueCalcOpen] = useState<boolean>(false);
   const [partialModalSupp, setPartialModalSupp] = useState<Supplement | null>(null);
   const [partialAmount, setPartialAmount] = useState<number>(0);
   const [partialNotes, setPartialNotes] = useState<string>('');
@@ -249,8 +258,77 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
         </div>
       )}
 
-      {/* Section 1: Due Today */}
-      <div>
+      {/* Top View Mode Switcher & Quick Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-stone-200/80 dark:border-stone-800">
+        <div className="flex items-center p-1 bg-stone-100 dark:bg-stone-850 rounded-2xl border border-stone-200 dark:border-stone-800 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setViewMode('slots')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              viewMode === 'slots'
+                ? 'bg-white dark:bg-stone-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
+                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+            }`}
+          >
+            <ListChecks className="w-4 h-4 text-emerald-500" />
+            <span>Time-Based Slots</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('cards')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              viewMode === 'cards'
+                ? 'bg-white dark:bg-stone-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
+                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4 text-stone-400" />
+            <span>Cards Grid</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setIsValueCalcOpen(true)}
+            className="px-3.5 py-2 text-xs font-bold text-stone-700 dark:text-stone-300 bg-white dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 border border-stone-200 dark:border-stone-800 rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+          >
+            <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Value & Refill Predictor</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenAddModal}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] rounded-xl transition shadow-xs cursor-pointer"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Add Supplement</span>
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'slots' ? (
+        <DailyChecklist
+          todayStatuses={todayStatuses}
+          allSupplements={allSupplements}
+          todayLogs={todayLogs}
+          onTakeDose={onTakeDose}
+          onUndoDose={onUndoDose}
+          onOpenAddModal={onOpenAddModal}
+          onSelectSupplement={onSelectSupplement}
+          onRefillStock={onRefillStock}
+          onOpenValueCalculator={() => setIsValueCalcOpen(true)}
+          currentTime={currentTime}
+          profiles={profiles}
+          activeProfileId={activeProfileId}
+          onSelectProfile={onSelectProfile}
+        />
+      ) : (
+        <>
+          {/* Section 1: Due Today */}
+          <div>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-900 font-display flex items-center gap-2">
@@ -507,6 +585,8 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
           </div>
         </div>
       )}
+    </>
+  )}
 
       {/* Section 3: Today's Individual Logged Dosages (with direct deletion) */}
       {todayLogs.length > 0 && (
@@ -822,6 +902,15 @@ export const TodayDoses: React.FC<TodayDosesProps> = ({
           </div>
         </div>
       )}
+
+      {/* Value & Refill Predictor Modal */}
+      <ValueCalculator
+        isOpen={isValueCalcOpen}
+        onClose={() => setIsValueCalcOpen(false)}
+        supplements={allSupplements}
+        onUpdateSupplement={onUpdateSupplement}
+        onRefillStock={onRefillStock}
+      />
     </div>
   );
 };

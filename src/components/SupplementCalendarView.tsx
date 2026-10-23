@@ -18,7 +18,9 @@ import {
   Pill,
   Utensils,
   Repeat,
-  Info
+  Info,
+  Trash2,
+  CalendarX
 } from 'lucide-react';
 import { Supplement, DoseLog, DayOfWeek } from '../types/supplement';
 import { 
@@ -35,10 +37,12 @@ import {
   signInWithGoogleCalendar, 
   signOutGoogleCalendar, 
   syncSupplementToGoogleCalendar, 
+  removeSupplementFromCalendar,
   generateGoogleCalendarWebUrl, 
   downloadICalFile 
 } from '../utils/googleCalendar';
 import { User } from 'firebase/auth';
+import { DeleteCalendarChangesModal } from './DeleteCalendarChangesModal';
 
 interface SupplementCalendarViewProps {
   supplements: Supplement[];
@@ -48,6 +52,7 @@ interface SupplementCalendarViewProps {
   onOpenEditModal?: (supplement: Supplement) => void;
   onQuickLog?: (supplement: Supplement, amount?: number, notes?: string) => void;
   onUpdateSupplement?: (supplement: Supplement) => void;
+  onBatchUpdateSupplements?: (supplements: Supplement[]) => void;
 }
 
 export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
@@ -58,6 +63,7 @@ export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
   onOpenEditModal,
   onQuickLog,
   onUpdateSupplement,
+  onBatchUpdateSupplements,
 }) => {
   const [selectedSuppId, setSelectedSuppId] = useState<string>(initialSelectedSupplementId);
   const [viewDate, setViewDate] = useState<Date>(() => new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
@@ -69,6 +75,7 @@ export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
   const [isSigningIn, setIsSigningIn] = useState<boolean>(false);
   const [syncingSuppId, setSyncingSuppId] = useState<string | null>(null);
   const [syncStatusMsg, setSyncStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState<boolean>(false);
 
   // Destructive / Confirmation Dialog State (MANDATORY per Workspace integration guidelines)
   const [confirmModal, setConfirmModal] = useState<{
@@ -406,6 +413,34 @@ export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
     });
   };
 
+  // Remove single supplement from Google Calendar
+  const handleRemoveSingleSupplement = (supp: Supplement) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Remove ${supp.name} from Google Calendar?`,
+      description: `Supple Pulse will delete the recurring dosing event and reminders for "${supp.name}" from your primary Google Calendar and turn off calendar sync for this supplement.`,
+      actionLabel: 'Remove Event',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          setSyncingSuppId(supp.id);
+          await removeSupplementFromCalendar(supp, onUpdateSupplement);
+          setSyncStatusMsg({
+            text: `Successfully removed ${supp.name} from Google Calendar.`,
+            type: 'success',
+          });
+        } catch (err: any) {
+          setSyncStatusMsg({
+            text: `Could not delete event: ${err.message}`,
+            type: 'error',
+          });
+        } finally {
+          setSyncingSuppId(null);
+        }
+      },
+    });
+  };
+
   const monthName = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
@@ -486,7 +521,7 @@ export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
                 type="button"
                 onClick={handleSyncAllRegimens}
                 disabled={syncingSuppId === 'all'}
-                className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-xl transition shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-xl transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${syncingSuppId === 'all' ? 'animate-spin' : ''}`} />
                 <span>{syncingSuppId === 'all' ? 'Syncing All...' : 'Sync All Stash to Calendar'}</span>
@@ -494,28 +529,50 @@ export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
 
               <button
                 type="button"
+                onClick={() => setIsDeleteAllModalOpen(true)}
+                title="Delete all changes made to your Google Calendar by Supple Pulse"
+                className="px-3.5 py-2 text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/80 rounded-xl transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                <span>Delete All Calendar Changes</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleGoogleSignOut}
                 title="Disconnect Google Calendar"
-                className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition"
+                className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={isSigningIn}
-              className="px-4 py-2 text-xs font-bold text-stone-800 dark:text-white bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 active:scale-[0.98] rounded-xl border border-stone-300 dark:border-stone-700 transition flex items-center gap-2 shadow-2xs"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-              </svg>
-              <span>{isSigningIn ? 'Connecting...' : 'Sign in with Google'}</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isSigningIn}
+                className="px-4 py-2 text-xs font-bold text-stone-800 dark:text-white bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 active:scale-[0.98] rounded-xl border border-stone-300 dark:border-stone-700 transition flex items-center gap-2 shadow-2xs cursor-pointer"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                <span>{isSigningIn ? 'Connecting...' : 'Sign in with Google'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsDeleteAllModalOpen(true)}
+                title="Manage or delete Google Calendar changes"
+                className="px-3.5 py-2 text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/80 rounded-xl transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                <span>Delete All Calendar Changes</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -634,11 +691,23 @@ export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
                 type="button"
                 onClick={() => handleSyncSupplement(selectedSupplement)}
                 disabled={syncingSuppId === selectedSupplement.id}
-                className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-xl transition shadow-xs flex items-center gap-1.5"
+                className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${syncingSuppId === selectedSupplement.id ? 'animate-spin' : ''}`} />
                 <span>{selectedSupplement.googleCalendarEventId ? 'Update on Google Calendar' : 'Put into Google Calendar'}</span>
               </button>
+
+              {(selectedSupplement.googleCalendarEventId || selectedSupplement.syncToGoogleCalendar) && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSingleSupplement(selectedSupplement)}
+                  title="Remove this supplement from Google Calendar"
+                  className="px-2.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/80 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                  <span>Remove from Calendar</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -949,6 +1018,17 @@ export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
                     >
                       <CalendarIcon className="w-4 h-4" />
                     </button>
+
+                    {(supp.googleCalendarEventId || supp.syncToGoogleCalendar) && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSingleSupplement(supp)}
+                        title="Remove this supplement from Google Calendar"
+                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-950/60 rounded-xl transition cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -956,6 +1036,21 @@ export const SupplementCalendarView: React.FC<SupplementCalendarViewProps> = ({
           )}
         </div>
       )}
+
+      {/* Delete All Calendar Changes Modal */}
+      <DeleteCalendarChangesModal
+        isOpen={isDeleteAllModalOpen}
+        onClose={() => setIsDeleteAllModalOpen(false)}
+        supplements={supplements}
+        onUpdateSupplement={onUpdateSupplement}
+        onBatchUpdateSupplements={onBatchUpdateSupplements}
+        onSuccess={(result) => {
+          setSyncStatusMsg({
+            text: `Successfully deleted ${result.deletedCount} events from Google Calendar and reset ${result.clearedLocalCount} supplement sync statuses.`,
+            type: 'success',
+          });
+        }}
+      />
 
     </div>
   );

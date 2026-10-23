@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { NavTab } from './Header';
 import { UserProfile, ProfileType } from '../types/profile';
-import { DiscordAuthUser } from '../utils/discordAuthClient';
+import { GoogleUser } from '../types/auth';
 import { CapsuleLogo } from './CapsuleLogo';
 
 interface MobileNavigationDrawerProps {
@@ -28,8 +28,8 @@ interface MobileNavigationDrawerProps {
   todayDueCount: number;
   activeProfile: UserProfile;
   onOpenProfileSwitcher: () => void;
-  discordUser?: DiscordAuthUser | null;
-  onOpenDiscordSecurity?: () => void;
+  googleUser?: GoogleUser | null;
+  onOpenCloudBackup?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
 }
@@ -42,8 +42,8 @@ export const MobileNavigationDrawer: React.FC<MobileNavigationDrawerProps> = ({
   todayDueCount,
   activeProfile,
   onOpenProfileSwitcher,
-  discordUser,
-  onOpenDiscordSecurity,
+  googleUser,
+  onOpenCloudBackup,
   theme = 'light',
   onToggleTheme,
 }) => {
@@ -247,13 +247,13 @@ export const MobileNavigationDrawer: React.FC<MobileNavigationDrawerProps> = ({
             </div>
           </div>
 
-          {/* Account Sign-In & Security (Google 1-Tap & Cloud Sync) */}
-          {onOpenDiscordSecurity && (
+          {/* Google Drive Cloud Backup */}
+          {onOpenCloudBackup && (
             <button
               type="button"
               onClick={() => {
                 onClose();
-                onOpenDiscordSecurity();
+                onOpenCloudBackup();
               }}
               className="w-full text-left rounded-2xl p-3.5 text-xs font-semibold text-stone-900 dark:text-stone-100 bg-stone-50 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-800 hover:border-indigo-400 dark:hover:border-indigo-600 transition shadow-xs cursor-pointer"
             >
@@ -264,15 +264,15 @@ export const MobileNavigationDrawer: React.FC<MobileNavigationDrawerProps> = ({
                   </div>
                   <div>
                     <span className="block font-bold text-sm">
-                      {discordUser ? 'Account & Security' : 'Sign In & Security'}
+                      {googleUser ? 'Google Drive Backup' : 'Connect Google Drive'}
                     </span>
                     <span className="block text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
-                      {discordUser ? (
+                      {googleUser ? (
                         <span className="text-emerald-600 dark:text-emerald-400 font-medium truncate inline-block max-w-[170px]">
-                          ● {discordUser.email}
+                          ● {googleUser.email}
                         </span>
                       ) : (
-                        '1-Tap Google Sign-In & Sync'
+                        'Private AppData Sync & Backup'
                       )}
                     </span>
                   </div>

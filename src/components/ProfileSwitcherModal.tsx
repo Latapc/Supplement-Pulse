@@ -9,8 +9,6 @@ import {
   Plus, 
   Check, 
   X, 
-  Lock, 
-  Unlock, 
   Edit3, 
   Trash2,
   Tv,
@@ -39,9 +37,6 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
 }) => {
   const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [pinPromptForProfile, setPinPromptForProfile] = useState<UserProfile | null>(null);
-  const [enteredPin, setEnteredPin] = useState('');
-  const [pinError, setPinError] = useState(false);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -49,7 +44,6 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   const [formRelation, setFormRelation] = useState('');
   const [formAvatar, setFormAvatar] = useState('user');
   const [formNotes, setFormNotes] = useState('');
-  const [formPin, setFormPin] = useState('');
 
   if (!isOpen) return null;
 
@@ -68,7 +62,6 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
     setFormRelation('Family Member');
     setFormAvatar('user');
     setFormNotes('');
-    setFormPin('');
   };
 
   const handleStartEdit = (profile: UserProfile, e: React.MouseEvent) => {
@@ -80,7 +73,6 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
     setFormRelation(profile.relation);
     setFormAvatar(profile.avatar);
     setFormNotes(profile.notes || '');
-    setFormPin(profile.pinCode || '');
   };
 
   const handleSaveForm = (e: React.FormEvent) => {
@@ -105,7 +97,6 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
           : 'from-emerald-500 to-teal-700',
         accentColor: formType === 'kid' ? '#f43f5e' : formType === 'assisted' ? '#3b82f6' : '#10b981',
         isPrimary: false,
-        pinCode: formType === 'kid' ? (formPin || '1234') : undefined,
         notes: formNotes.trim(),
       };
       const updated = [...profiles, newProfile];
@@ -121,7 +112,6 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
             relation: formRelation.trim(),
             avatar: formAvatar,
             notes: formNotes.trim(),
-            pinCode: formType === 'kid' ? (formPin || '1234') : undefined,
           };
         }
         return p;
@@ -134,33 +124,9 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   };
 
   const handleProfileClick = (profile: UserProfile) => {
-    const currentActive = profiles.find(p => p.id === activeProfileId);
-    if (currentActive?.type === 'kid' && currentActive.pinCode && profile.id !== currentActive.id) {
-      setPinPromptForProfile(profile);
-      setEnteredPin('');
-      setPinError(false);
-      return;
-    }
-
     triggerHaptic('light');
     onSelectProfile(profile.id);
     onClose();
-  };
-
-  const handleUnlockPin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const currentActive = profiles.find(p => p.id === activeProfileId);
-    if (enteredPin === currentActive?.pinCode || enteredPin === '1234') {
-      triggerHaptic('success');
-      if (pinPromptForProfile) {
-        onSelectProfile(pinPromptForProfile.id);
-      }
-      setPinPromptForProfile(null);
-      onClose();
-    } else {
-      triggerHaptic('medium');
-      setPinError(true);
-    }
   };
 
   return (
@@ -194,52 +160,6 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
 
         {/* Content Area */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 bg-white dark:bg-[#1a1714]">
-          {/* PIN Lock Prompt if trying to exit Kids profile */}
-          {pinPromptForProfile && (
-            <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-500/50 text-amber-950 dark:text-amber-100 space-y-3">
-              <div className="flex items-center gap-2 font-bold text-sm">
-                <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                <span>Parental Control PIN Required</span>
-              </div>
-              <p className="text-xs text-amber-850 dark:text-amber-200 font-medium">
-                Enter your 4-digit PIN to exit Kids Profile (Default PIN is 1234).
-              </p>
-              <form onSubmit={handleUnlockPin} className="flex gap-2">
-                <input
-                  type="password"
-                  maxLength={4}
-                  value={enteredPin}
-                  onChange={e => {
-                    setEnteredPin(e.target.value);
-                    setPinError(false);
-                  }}
-                  placeholder="PIN"
-                  className={`w-28 px-3 py-2 text-center text-lg tracking-widest font-mono rounded-xl bg-white dark:bg-stone-800 border ${
-                    pinError ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-stone-300 dark:border-stone-600'
-                  } text-stone-900 dark:text-white font-bold`}
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-                >
-                  Unlock
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPinPromptForProfile(null)}
-                  className="px-3 py-2 text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white text-xs font-semibold"
-                >
-                  Cancel
-                </button>
-              </form>
-              {pinError && (
-                <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">
-                  Incorrect PIN. Try 1234 or your configured code.
-                </p>
-              )}
-            </div>
-          )}
 
           {/* Profile Cards Grid */}
           {!editingProfile && !isCreating && (
@@ -420,26 +340,6 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                   </select>
                 </div>
               </div>
-
-              {formType === 'kid' && (
-                <div className="p-3.5 rounded-xl bg-pink-50 dark:bg-pink-950/40 border border-pink-300 dark:border-pink-800 text-pink-950 dark:text-pink-100 space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-xs">
-                    <Lock className="w-4 h-4 text-pink-600 dark:text-pink-400" />
-                    <span>Parental Lock PIN</span>
-                  </div>
-                  <p className="text-xs text-pink-850 dark:text-pink-200 font-medium">
-                    Set a 4-digit code required to leave Kids Mode or edit regimens:
-                  </p>
-                  <input
-                    type="text"
-                    maxLength={4}
-                    placeholder="1234"
-                    value={formPin}
-                    onChange={e => setFormPin(e.target.value.replace(/\D/g, ''))}
-                    className="w-28 px-3 py-1.5 font-mono text-center tracking-widest text-sm rounded-lg bg-white dark:bg-stone-800 border border-pink-400 dark:border-pink-700 text-stone-900 dark:text-white font-bold"
-                  />
-                </div>
-              )}
 
               <div>
                 <label className="block text-xs font-bold text-stone-800 dark:text-stone-200 mb-1">

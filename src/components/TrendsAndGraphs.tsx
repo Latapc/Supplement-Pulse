@@ -28,6 +28,7 @@ interface TrendsAndGraphsProps {
   onOpenEditModal?: (supplement: Supplement) => void;
   onQuickLog?: (supplement: Supplement, amount?: number, notes?: string) => void;
   onUpdateSupplement?: (supplement: Supplement) => void;
+  onBatchUpdateSupplements?: (supplements: Supplement[]) => void;
 }
 
 type AggregationPeriod = 'weekly' | 'monthly' | 'yearly' | 'daily';
@@ -42,6 +43,7 @@ export const TrendsAndGraphs: React.FC<TrendsAndGraphsProps> = ({
   onOpenEditModal,
   onQuickLog,
   onUpdateSupplement,
+  onBatchUpdateSupplements,
 }) => {
   const [viewMode, setViewMode] = useState<'calendar' | 'analytics'>(initialViewMode);
   const [period, setPeriod] = useState<AggregationPeriod>('weekly');
@@ -424,6 +426,7 @@ export const TrendsAndGraphs: React.FC<TrendsAndGraphsProps> = ({
           onOpenEditModal={onOpenEditModal}
           onQuickLog={onQuickLog}
           onUpdateSupplement={onUpdateSupplement}
+          onBatchUpdateSupplements={onBatchUpdateSupplements}
         />
       ) : (
         <>

@@ -1,5 +1,5 @@
 // SuppleTrack Service Worker for offline support and Android PWA installability
-const CACHE_NAME = 'suppletrack-cache-v1';
+const CACHE_NAME = 'suppletrack-cache-v3';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -42,42 +42,31 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Let API calls go to network
-  if (url.pathname.startsWith('/api/')) return;
+  // Never cache development modules, Vite runtime, node_modules, source files, or APIs
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/@') ||
+    url.pathname.includes('node_modules') ||
+    url.pathname.includes('vite') ||
+    url.pathname.endsWith('.ts') ||
+    url.pathname.endsWith('.tsx') ||
+    url.search.includes('t=') ||
+    url.search.includes('v=')
+  ) {
+    return; // Pass through to network
+  }
 
+  // Only handle static assets or navigation fallback
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cached and update in background
-        fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse.clone());
-              });
-            }
-          })
-          .catch(() => {});
-        return cachedResponse;
-      }
-
-      return fetch(event.request)
-        .then((networkResponse) => {
-          if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-            return networkResponse;
-          }
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-          return networkResponse;
-        })
-        .catch(() => {
-          // If offline and navigating to page, fallback to root
-          if (event.request.mode === 'navigate') {
-            return caches.match('/');
-          }
-        });
+    fetch(event.request).catch(() => {
+      return caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        if (event.request.mode === 'navigate') {
+          return caches.match('/');
+        }
+        return Promise.reject('offline');
+      });
     })
   );
 });

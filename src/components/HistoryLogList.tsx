@@ -15,9 +15,9 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { DoseLog, Supplement } from '../types/supplement';
-import { exportBackupData, importBackupData } from '../utils/storage';
+import { exportBackupData, importBackupData, exportLogsToCSV } from '../utils/storage';
 import { formatDateToYYYYMMDD } from '../utils/dates';
-import { DiscordAuthUser } from '../utils/discordAuthClient';
+import { GoogleUser } from '../types/auth';
 
 interface HistoryLogListProps {
   logs: DoseLog[];
@@ -25,10 +25,10 @@ interface HistoryLogListProps {
   onDeleteLog: (logId: string) => void;
   onAddManualLog: (log: Omit<DoseLog, 'id'>) => void;
   onRefreshData: () => void;
-  discordUser?: DiscordAuthUser | null;
+  googleUser?: GoogleUser | null;
   isSyncing?: boolean;
   lastSyncedTime?: string | null;
-  onOpenDiscordSecurity?: () => void;
+  onOpenCloudBackup?: () => void;
   onQuickSyncCloud?: () => Promise<void>;
 }
 
@@ -38,10 +38,10 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
   onDeleteLog,
   onAddManualLog,
   onRefreshData,
-  discordUser,
+  googleUser,
   isSyncing = false,
   lastSyncedTime,
-  onOpenDiscordSecurity,
+  onOpenCloudBackup,
   onQuickSyncCloud,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,6 +64,10 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
       return true;
     })
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const handleExportCSV = () => {
+    exportLogsToCSV(logs, supplements);
+  };
 
   const handleExport = () => {
     const dataStr = exportBackupData();
@@ -138,20 +142,30 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Security Account Sync Button */}
-          {onOpenDiscordSecurity && (
+          {/* Google Cloud Backup Button */}
+          {onOpenCloudBackup && (
             <button
-              onClick={onOpenDiscordSecurity}
+              onClick={onOpenCloudBackup}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition shadow-2xs cursor-pointer ${
-                discordUser
+                googleUser
                   ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/80'
                   : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200 border-stone-300 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800'
               }`}
             >
-              <Shield className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>{discordUser ? (isSyncing ? 'Syncing...' : 'Account Synced') : 'Account Security'}</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>{googleUser ? (isSyncing ? 'Syncing...' : 'Google Drive Synced') : 'Google Backup'}</span>
             </button>
           )}
+
+          {/* One-Click CSV Export for Doctor / Bloodwork */}
+          <button
+            onClick={handleExportCSV}
+            title="Download CSV spreadsheet for Excel or doctor consultations"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded-xl transition shadow-2xs cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Download CSV</span>
+          </button>
 
           {/* Manual Log Button */}
           <button
@@ -169,7 +183,7 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 rounded-xl transition"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Offline File</span>
+            <span className="hidden sm:inline">JSON Backup</span>
           </button>
 
           {/* Secondary manual import */}
@@ -186,34 +200,34 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
 
       {/* Account Cloud Sync Callout Banner */}
       <div className={`p-4 rounded-2xl border transition-all ${
-        discordUser 
+        googleUser 
           ? 'bg-indigo-50/70 dark:bg-indigo-950/70 border-indigo-200/80 dark:border-indigo-800/80 text-indigo-950 dark:text-indigo-100'
           : 'bg-stone-50 dark:bg-stone-900 border-stone-200/90 dark:border-stone-800 text-stone-800 dark:text-stone-100'
       }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
             <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${
-              discordUser ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300' : 'bg-stone-200/80 dark:bg-stone-800 text-stone-600 dark:text-stone-300'
+              googleUser ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300' : 'bg-stone-200/80 dark:bg-stone-800 text-stone-600 dark:text-stone-300'
             }`}>
               <ShieldCheck className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="text-xs font-bold font-display text-stone-900 dark:text-white">
-                  {discordUser ? 'Account Cloud Backup Active' : 'Discord-Style Account Security'}
+                  {googleUser ? 'Google Drive Cloud Backup Active' : 'Private Google Drive Backup'}
                 </h4>
-                {discordUser && (
+                {googleUser && (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-200/70 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-200 font-mono">
-                    {discordUser.email}
+                    {googleUser.email}
                   </span>
                 )}
               </div>
               <p className="text-[11px] text-stone-600 dark:text-stone-300 mt-0.5">
-                {discordUser
-                  ? `Your supplement regimens, past intake logs, and schedules are encrypted and protected under your verified account.`
-                  : `Sign in or create an account with email verification and IP address authorization to automatically protect and sync your regimens.`}
+                {googleUser
+                  ? `Your supplement regimens, past intake logs, and schedules are encrypted in your private Google Drive AppData folder.`
+                  : `Sign in with Google to automatically backup and sync your regimens to your private Google Drive AppData space.`}
               </p>
-              {lastSyncedTime && discordUser && (
+              {lastSyncedTime && googleUser && (
                 <p className="text-[10px] text-indigo-700 dark:text-indigo-400 font-medium mt-1">
                   Last cloud backup: {lastSyncedTime}
                 </p>
@@ -222,7 +236,7 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {discordUser ? (
+            {googleUser ? (
               <>
                 {onQuickSyncCloud && (
                   <button
@@ -235,25 +249,25 @@ export const HistoryLogList: React.FC<HistoryLogListProps> = ({
                     <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
                   </button>
                 )}
-                {onOpenDiscordSecurity && (
+                {onOpenCloudBackup && (
                   <button
                     type="button"
-                    onClick={onOpenDiscordSecurity}
-                    className="px-3 py-1.5 bg-white text-stone-700 hover:bg-stone-100 border border-stone-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+                    onClick={onOpenCloudBackup}
+                    className="px-3 py-1.5 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 border border-stone-200 dark:border-stone-700 rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer"
                   >
-                    Manage
+                    Account Settings
                   </button>
                 )}
               </>
             ) : (
-              onOpenDiscordSecurity && (
+              onOpenCloudBackup && (
                 <button
                   type="button"
-                  onClick={onOpenDiscordSecurity}
+                  onClick={onOpenCloudBackup}
                   className="flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer"
                 >
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>Sign In / Security</span>
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Connect Google</span>
                 </button>
               )
             )}

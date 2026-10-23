@@ -12,7 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { UserProfile, ProfileType } from '../types/profile';
-import { DiscordAuthUser } from '../utils/discordAuthClient';
+import { GoogleUser } from '../types/auth';
 import { CapsuleLogo } from './CapsuleLogo';
 import { MobileNavigationDrawer } from './MobileNavigationDrawer';
 
@@ -23,8 +23,8 @@ interface HeaderProps {
   setActiveTab: (tab: NavTab) => void;
   onOpenProfileSwitcher: () => void;
   todayDueCount: number;
-  discordUser?: DiscordAuthUser | null;
-  onOpenDiscordSecurity?: () => void;
+  googleUser?: GoogleUser | null;
+  onOpenCloudBackup?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
   activeProfile: UserProfile;
@@ -35,8 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   onOpenProfileSwitcher,
   todayDueCount,
-  discordUser,
-  onOpenDiscordSecurity,
+  googleUser,
+  onOpenCloudBackup,
   theme = 'light',
   onToggleTheme,
   activeProfile,
@@ -161,8 +161,8 @@ export const Header: React.FC<HeaderProps> = ({
       todayDueCount={todayDueCount}
       activeProfile={activeProfile}
       onOpenProfileSwitcher={onOpenProfileSwitcher}
-      discordUser={discordUser}
-      onOpenDiscordSecurity={onOpenDiscordSecurity}
+      googleUser={googleUser}
+      onOpenCloudBackup={onOpenCloudBackup}
       theme={theme}
       onToggleTheme={onToggleTheme}
     />
